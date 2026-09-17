@@ -2,207 +2,122 @@
 
 ### AI-Powered Financial Intelligence and Analysis System
 
-InsightForge is a hybrid financial intelligence platform designed to automate the analysis of large financial datasets and convert raw financial data into reliable, interpretable insights.
+InsightForge is a hybrid financial intelligence platform that transforms large financial datasets into **reliable financial analysis and actionable insights**.
 
-The system combines **deterministic financial computation using Python, Pandas, and NumPy** with **AI-powered interpretation using Large Language Models (LLMs)**.
+It combines **deterministic data processing and financial computation** with **AI-powered interpretation**, ensuring that financial calculations remain accurate and verifiable while allowing users to interact with the results naturally.
 
 > **Compute deterministically. Interpret intelligently.**
 
 ---
 
-## 📌 Problem Statement
+## 🎯 Problem
 
-Large financial spreadsheets often contain hundreds or thousands of records and numerous financial attributes, making manual analysis time-consuming and error-prone.
+Large financial spreadsheets can be difficult and time-consuming to analyse manually. Extracting meaningful patterns, identifying risks, and generating useful insights from raw financial data often requires significant effort.
 
-While general-purpose AI tools can assist with interpretation, directly relying on an LLM for financial calculations can lead to unreliable or unverifiable results.
+General-purpose AI systems can assist with interpretation, but relying on them directly for financial calculations may produce results that are difficult to verify.
 
-InsightForge addresses this problem through a **hybrid architecture**:
-
-- Financial calculations are performed deterministically using Python.
-- Data is cleaned and validated before analysis.
-- Structured analytical results are generated in JSON format.
-- An LLM uses the validated results to generate natural-language insights.
-- A Streamlit-based interface presents the analysis interactively.
+InsightForge addresses this by separating **financial computation from AI interpretation**.
 
 ---
 
-## 🎯 Objectives
+## 💡 Solution
 
-- Automate financial data ingestion and preprocessing.
-- Calculate important financial KPIs.
-- Analyse debtor ageing and regional exposure.
-- Validate financial calculations and ensure data consistency.
-- Detect financial risks and anomalies.
-- Generate natural-language financial insights using an LLM.
-- Support natural-language financial queries.
-- Provide interactive financial visualizations.
-- Produce structured outputs that can be consumed by the AI layer.
+InsightForge follows a hybrid approach:
 
----
+**Financial Data → Processing → Validation → Analysis → Structured Results → AI Interpretation → Insights**
 
-## 🏗️ System Architecture
+### Financial Analytics
 
-```text
-                    Financial Dataset
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │  Data Ingestion  │
-                  │     Pandas      │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Data Cleaning & │
-                  │ Preprocessing   │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Data Validation │
-                  │ & Reconciliation│
-                  └────────┬────────┘
-                           │
-                           ▼
-              ┌──────────────────────────┐
-              │   Financial Analytics   │
-              │                          │
-              │ • KPIs                   │
-              │ • Ageing Analysis        │
-              │ • Regional Analysis      │
-              │ • Trend Analysis         │
-              └────────────┬─────────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Structured JSON │
-                  │     Output      │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │   AI / LLM      │
-                  │ Interpretation  │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Streamlit       │
-                  │ Dashboard       │
-                  └─────────────────┘
-```
+The deterministic analytics layer handles:
 
----
-
-## 🔄 Hybrid Intelligence Approach
-
-InsightForge separates **calculation** from **interpretation**.
-
-### Deterministic Layer
-
-The financial analytics layer uses:
-
-- Python
-- Pandas
-- NumPy
-
-This layer performs:
-
-- Data loading
+- Data ingestion and preprocessing
 - Data cleaning
-- Financial calculations
-- KPI generation
-- Ageing calculations
-- Regional analysis
-- Validation
-- Financial reconciliation
+- Financial KPI calculation
+- Debtor ageing analysis
+- Regional exposure analysis
+- Financial validation and reconciliation
+- Structured JSON output generation
 
-This ensures that numerical results are generated through reproducible computations rather than LLM reasoning.
+### AI Intelligence
 
-### AI Interpretation Layer
+The AI layer handles:
 
-The AI layer is responsible for:
-
-- Risk identification
+- Risk analysis
 - Anomaly detection
 - Natural-language financial insights
 - Financial summaries
-- Natural-language Q&A
+- Natural-language queries
 - AI-assisted interpretation of validated results
 
-The AI layer receives structured and validated financial information instead of directly performing the core financial calculations.
+This approach allows the AI to work with **validated financial results instead of performing critical calculations itself**.
 
 ---
 
-## 📊 Current Implementation
-
-The current financial analytics pipeline has been tested on the project's financial debtor dataset.
-
-### Current Dataset Processing
-
-- **Records processed:** 819
-- **Columns:** 51
-- **Duplicate records detected:** 0
-- **Financial reconciliation:** Passed
-
-The financial validation process verifies that the calculated outstanding amount reconciles with the total amount across the ageing buckets.
-
-Example validation result:
+## 🏗️ Architecture
 
 ```text
-Outstanding Total : 6402.48
-Ageing Total      : 6402.48
-Difference        : 0.00
-Consistency       : True
+              Financial Dataset
+                     │
+                     ▼
+              Data Ingestion
+                     │
+                     ▼
+            Data Cleaning
+                     │
+                     ▼
+          Validation & Checks
+                     │
+                     ▼
+         Financial Analytics
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+        KPIs      Ageing     Regional
+                  Analysis    Analysis
+          └──────────┼──────────┘
+                     ▼
+              Structured JSON
+                     │
+                     ▼
+                 AI Layer
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+        Risk      Insights      Q&A
+       Analysis
+                     │
+                     ▼
+             Streamlit Dashboard
 ```
-
-> **Note:** The original financial dataset is not included in the public repository because it may contain sensitive financial information.
 
 ---
 
-## 📈 Financial Analytics
+## 📊 Key Features
 
-The backend currently provides the following analytical capabilities.
+- **Automated Financial Analysis**
+- **KPI Generation**
+- **Debtor Ageing Analysis**
+- **Regional Exposure Analysis**
+- **Financial Data Validation**
+- **Risk & Anomaly Detection**
+- **AI-Generated Financial Insights**
+- **Natural-Language Financial Q&A**
+- **Interactive Dashboard**
+- **Structured JSON Data Exchange**
 
-### Key Performance Indicators
+---
 
-- Total outstanding
-- Number of accounts
-- Average outstanding per account
+## 🛠️ Tech Stack
 
-### Ageing Analysis
-
-The system analyses outstanding amounts across multiple ageing buckets:
-
-```text
-0-30
-31-60
-61-90
-91-120
-121-150
-151-180
-181-210
-211-335
-335-365
-366-395
-396-730
-731-760
-761-1028
-1028+
-```
-
-### Regional Analysis
-
-Outstanding exposure is grouped by region to identify areas with higher financial exposure.
-
-### Validation
-
-The validation layer currently performs:
-
-- Missing-value count
-- Duplicate-record detection
-- Outstanding-vs-ageing reconciliation
-- Financial consistency verification
+| Area | Technology |
+|---|---|
+| Programming | Python |
+| Data Processing | Pandas, NumPy |
+| Data Input | Excel |
+| Data Exchange | JSON |
+| AI | Google Gemini API / LLM |
+| Dashboard | Streamlit |
+| Visualization | Plotly, Matplotlib |
+| Testing | Pytest |
+| Version Control | Git, GitHub |
 
 ---
 
@@ -211,254 +126,115 @@ The validation layer currently performs:
 ```text
 InsightForge/
 │
-├── README.md
-├── .gitignore
-├── requirements.txt
-│
 ├── backend/
-│   ├── __init__.py
-│   ├── main.py
-│   │
 │   ├── data/
-│   │   └── <financial_dataset>.xlsx
-│   │
 │   ├── outputs/
-│   │   └── financial_results.json
+│   ├── services/
+│   │   ├── data_loader.py
+│   │   ├── data_cleaning.py
+│   │   ├── validation.py
+│   │   ├── financial_analysis.py
+│   │   ├── ageing_analysis.py
+│   │   ├── regional_analysis.py
+│   │   └── json_export.py
 │   │
-│   └── services/
-│       ├── __init__.py
-│       ├── data_loader.py
-│       ├── data_cleaning.py
-│       ├── validation.py
-│       ├── financial_analysis.py
-│       ├── ageing_analysis.py
-│       ├── regional_analysis.py
-│       └── json_export.py
+│   └── main.py
 │
 ├── frontend/
 │   └── components/
 │
+├── ai/
+│   └── ...
+│
 ├── tests/
 │   └── test_calculations.py
 │
-└── ai/
-    └── ...
+├── requirements.txt
+├── .gitignore
+└── README.md
 ```
 
-The `frontend` and `ai` components are being developed alongside the financial analytics backend and will be integrated into the complete system in a subsequent phase.
-
 ---
 
-## ⚙️ Technologies Used
+## 🚀 Getting Started
 
-| Component | Technology |
-|---|---|
-| Programming Language | Python |
-| Data Processing | Pandas |
-| Numerical Computation | NumPy |
-| Data Input | Excel |
-| Data Exchange | JSON |
-| AI Layer | Google Gemini API / LLM |
-| Dashboard | Streamlit |
-| Visualization | Plotly / Matplotlib |
-| Testing | Python Testing Framework |
-| Version Control | Git & GitHub |
-
----
-
-## 🚀 Running the Backend
-
-### 1. Clone the Repository
+### Clone the repository
 
 ```bash
 git clone <repository-url>
 cd InsightForge
 ```
 
-### 2. Create a Virtual Environment
+### Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-### 3. Activate the Virtual Environment
+### Activate the environment
 
-#### Windows
+**Windows:**
 
 ```powershell
 .venv\Scripts\activate
 ```
 
-#### Linux / macOS
+**Linux / macOS:**
 
 ```bash
 source .venv/bin/activate
 ```
 
-### 4. Install Dependencies
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Add the Dataset
+### Add the dataset
 
-Place the authorized financial Excel dataset inside:
+Place the financial dataset inside:
 
 ```text
 backend/data/
 ```
 
-The dataset is intentionally excluded from GitHub because it may contain sensitive financial information.
-
-### 6. Run the Financial Analytics Pipeline
-
-From the project root:
+### Run the backend
 
 ```bash
 python -m backend.main
 ```
 
-The pipeline will:
-
-1. Load the Excel dataset.
-2. Clean the data.
-3. Validate the dataset.
-4. Calculate financial KPIs.
-5. Perform ageing analysis.
-6. Perform regional analysis.
-7. Export the structured results.
+The processed financial results are exported as a structured JSON file for use by the AI layer.
 
 ---
 
-## 📄 Output
+## 👥 Team
 
-The analytics pipeline generates a structured JSON output:
-
-```text
-backend/outputs/financial_results.json
-```
-
-Example structure:
-
-```json
-{
-    "dataset": {
-        "name": "Debtors May 26",
-        "total_records": 819,
-        "status": "validated"
-    },
-    "kpis": {
-        "total_outstanding": 6402.48,
-        "total_accounts": 819,
-        "average_outstanding": 7.82
-    },
-    "ageing": {
-        "0-30": 2594.19,
-        "31-60": 1652.55,
-        "61-90": 1243.69
-    },
-    "validation": {
-        "duplicate_records": 0,
-        "financial_consistency": true,
-        "validated": true
-    }
-}
-```
-
-This JSON acts as the structured communication layer between the financial analytics backend and the AI layer.
-
----
-
-## 🧪 Testing
-
-The project includes tests for financial calculations.
-
-Run the tests using:
-
-```bash
-python -m pytest
-```
-
-Testing focuses on verifying the correctness and consistency of financial calculations.
-
----
-
-## 👥 Team Contributions
-
-### Shreeyanshi Padhy — 24BDS0303
-
+### Shreeyanshi Padhy
 **Financial Analytics & Data Engineering**
 
-- Dataset ingestion
-- Data cleaning and preprocessing
-- Financial KPI calculations
-- Debtor ageing analysis
-- Regional exposure analysis
-- Financial validation and reconciliation
-- Structured JSON output generation
-- Calculation testing
+- Data processing and cleaning
+- Financial analysis
+- KPI calculation
+- Ageing and regional analysis
+- Data validation
+- JSON output pipeline
 
-### Abha Kiran Dongre — 24BDS0304
-
+### Abha Kiran Dongre
 **AI, Risk Analysis & Application Layer**
 
-- Risk indicators and risk scoring
-- Anomaly detection
-- Google Gemini API integration
-- AI prompt design
-- AI-generated financial insights
-- Natural-language financial Q&A
+- Risk and anomaly detection
+- Gemini API integration
+- AI prompts and financial insights
+- Natural-language Q&A
 - Streamlit dashboard
-- Plotly financial visualizations
-- AI/application-layer integration
+- Financial visualizations
 
 ---
 
-## 🔮 Future Work
+## 🌟 Core Principle
 
-The next development phase will focus on integrating the independently developed modules into a unified application.
+> **Compute deterministically. Interpret intelligently.**
 
-Planned improvements include:
-
-- Integration of the financial analytics backend with the AI layer.
-- Automated risk and anomaly analysis using validated financial results.
-- Interactive Streamlit dashboard integration.
-- Natural-language querying over financial data.
-- Additional financial trend analysis.
-- More comprehensive data-quality validation.
-- Improved testing and error handling.
-- End-to-end system testing.
-- Deployment of the integrated application.
-
----
-
-## 💡 Core Design Principle
-
-```text
-             COMPUTE DETERMINISTICALLY
-                         ↓
-                  VALIDATE RESULTS
-                         ↓
-              STRUCTURE THE OUTPUT
-                         ↓
-             INTERPRET INTELLIGENTLY
-```
-
-InsightForge is designed around the principle that **AI should interpret reliable financial computations rather than replace them**.
-
----
-
-## 📌 Project Status
-
-**Current Phase:** Review 2 — Core Implementation
-
-The project currently has independently implemented financial analytics and AI/application modules. The financial analytics backend has a working pipeline using the actual project dataset, while the AI and application components are being developed as a separate module.
-
-The modules will be integrated into a unified InsightForge application in the next development phase.
-
----
-
-## 📜 License
-
-This project is developed for academic purposes as part of the B.Tech Computer Science (Data Science) curriculum.
+InsightForge is built around the idea that **reliable financial computation and AI-powered interpretation should complement each other rather than replace one another.**
