@@ -1,11 +1,11 @@
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
-*.pyo
 
 # Virtual environment
-venv/
 .venv/
+venv/
 
 # Environment variables
 .env
@@ -17,8 +17,11 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Generated outputs
-backend/outputs/*
-
 # Temporary files
 *.tmp
+
+# Local financial dataset
+backend/data/*.xlsx
+
+# Generated financial output
+backend/outputs/*
