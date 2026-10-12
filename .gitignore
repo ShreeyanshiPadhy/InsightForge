@@ -1,3 +1,33 @@
+<<<<<<< HEAD
 .env
 __pycache__/
 *.pyc
+=======
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+
+# Local financial dataset
+backend/data/*.xlsx
+
+# Generated financial output
+backend/outputs/*
+>>>>>>> 878fd6011c24d31ac47b00bad5b7e2ba74eb51d1
