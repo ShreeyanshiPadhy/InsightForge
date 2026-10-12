@@ -1,0 +1,21 @@
+Account_ID,Customer_Name,Outstanding_Amount,Ageing_Days,Account_Status,Region
+A001,Alpha Traders,850000,120,Active,South
+A002,Beta Enterprises,75000,20,Active,North
+A003,Gamma Industries,420000,75,Active,West
+A004,Delta Solutions,180000,45,Active,South
+A005,Epsilon Corp,650000,105,Overdue,East
+A006,Zeta Ltd,95000,15,Active,North
+A007,Omega Retail,350000,65,Overdue,West
+A008,Prime Distributors,120000,35,Active,South
+A009,Vertex Systems,920000,150,Overdue,East
+A010,Global Supplies,280000,80,Active,North
+A011,Sunrise Foods,55000,10,Active,South
+A012,Metro Services,480000,95,Overdue,West
+A013,National Traders,310000,55,Active,East
+A014,Urban Products,125000,25,Active,North
+A015,Galaxy Exports,720000,110,Overdue,South
+A016,Blue Star Ltd,210000,70,Active,West
+A017,Evergreen Co,60000,30,Active,East
+A018,Future Tech,500000,90,Overdue,North
+A019,Starline Retail,140000,40,Active,South
+A020,Global Tech,1100000,180,Overdue,West
