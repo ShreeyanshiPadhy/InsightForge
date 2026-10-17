@@ -151,7 +151,7 @@ def clean_number(series):
         errors="coerce"
     ).fillna(0)
 
-def prepare_uploaded_data(raw_df):
+def prepare_uploaded_data(raw_df, risk_config=None):
     df=raw_df.copy()
 
     df.columns=[
@@ -295,9 +295,9 @@ def prepare_uploaded_data(raw_df):
             "No valid accounts were found. Check the account ID column."
         )
 
-    result=perform_risk_analysis(
+    result = perform_risk_analysis(
         result,
-        DEFAULT_RISK_CONFIG
+        risk_config or DEFAULT_RISK_CONFIG
     )
 
     exposure=result["Outstanding_Amount"]

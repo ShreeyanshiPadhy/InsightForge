@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import json
@@ -5,23 +6,80 @@ import sys
 import os
 import re
 
-from visualizations import risk_category_chart,risk_exposure_chart,top_exposure_chart,ageing_distribution_chart,risk_score_chart,regional_exposure_chart,regional_risk_chart
+from visualizations import (
+    risk_category_chart,
+    risk_exposure_chart,
+    top_exposure_chart,
+    ageing_distribution_chart,
+    risk_score_chart,
+    regional_exposure_chart,
+    regional_risk_chart,
+)
 from upload_processor import prepare_uploaded_data
+from ai.risk_detection import DEFAULT_RISK_CONFIG, perform_risk_analysis
+from pdf_generator import generate_financial_report
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../ai")))
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "../ai"))
+)
 
 from financial_context import create_financial_context
-from llm import answer_financial_question,generate_financial_summary
+from llm import answer_financial_question, generate_financial_summary
 from anomaly_detection import perform_anomaly_analysis
 
-st.set_page_config(page_title="InsightForge",page_icon="📊",layout="wide")
 
-DATA_FILE=os.path.abspath(os.path.join(os.path.dirname(__file__),"../outputs/risk_analysis.csv"))
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
 
-@st.cache_data
-def load_data():
-    return pd.read_csv(DATA_FILE)
+st.set_page_config(
+    page_title="InsightForge",
+    page_icon="📊",
+    layout="wide",
+)
 
+
+st.markdown("""
+<style>
+/* Make ALL buttons blue, including download buttons */
+.stButton > button,
+.stDownloadButton > button,
+button[kind="primary"],
+button[kind="secondary"] {
+    background-color: #2563EB !important;
+    color: white !important;
+    border: 1px solid #2563EB !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: background-color 0.2s ease;
+}
+
+/* Hover effect */
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+button[kind="primary"]:hover,
+button[kind="secondary"]:hover {
+    background-color: #1D4ED8 !important;
+    color: white !important;
+    border-color: #1D4ED8 !important;
+}
+
+/* Keyboard focus */
+.stButton > button:focus,
+.stDownloadButton > button:focus {
+    color: white !important;
+    box-shadow: 0 0 0 2px #93C5FD !important;
+}
+
+/* Keep disabled buttons visually distinct */
+.stButton > button:disabled,
+.stDownloadButton > button:disabled {
+    background-color: #64748B !important;
+    color: white !important;
+    border-color: #64748B !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 HEADER_HINTS = {
@@ -29,34 +87,49 @@ HEADER_HINTS = {
         "cust code", "cust.code", "customer code",
         "customer id", "account id", "debtor code",
         "debtor number", "account number", "client id",
-        "account_id"
+        "account_id",
     ],
     "customer_name": [
         "customer name", "client name", "debtor name",
         "account name", "customer", "debtor", "party",
-        "customer_name"
+        "customer_name",
     ],
     "outstanding": [
         "outstanding amount", "outstanding balance",
         "receivable amount", "open balance",
         "may'26 exp.", "amount due", "balance due",
-        "total outstanding", "outstanding_amount"
+        "total outstanding", "outstanding_amount",
     ],
     "region": [
         "region", "territory", "sales region",
-        "geography", "location"
+        "geography", "location",
     ],
     "status": [
         "active / inactive", "account status",
-        "customer status", "status"
+        "customer status", "status",
     ],
 }
 
 
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
 
 def normalize_header(value):
     value = str(value).replace("\u00a0", " ").strip().lower()
     return re.sub(r"[^a-z0-9]+", "", value)
+
+
+def format_inr(value):
+    """Format values in Indian Rupees, lakh, and crore."""
+    value = float(value)
+
+    if abs(value) >= 1_00_00_000:
+        return f"₹{value / 1_00_00_000:,.2f} crore"
+    elif abs(value) >= 1_00_000:
+        return f"₹{value / 1_00_000:,.2f} lakh"
+
+    return f"₹{value:,.2f}"
 
 
 def detect_header_row(preview):
@@ -86,8 +159,6 @@ def detect_header_row(preview):
                 if any(value == hint for hint in hints):
                     matched_fields.add(field)
 
-        # Ageing headings can help identify multi-purpose
-        # financial reports even when other labels vary.
         ageing_matches = sum(
             bool(re.search(r"\d+\s*(?:-|to)\s*\d+", value))
             or bool(re.search(r"\d+\s*\+", value))
@@ -102,385 +173,826 @@ def detect_header_row(preview):
             best_score = score
             best_row = int(row_index)
 
-    # Avoid confidently selecting a report title or data row
-    # when there is too little evidence of actual headings.
-    if best_score < 6:
-        return None
-
-    return best_row
+    return best_row if best_score >= 6 else None
 
 
-st.title("InsightForge")
+def safe_columns(dataframe, columns):
+    """Return only columns that exist in the dataframe."""
+    return [column for column in columns if column in dataframe.columns]
+
+
+# ============================================================
+# SESSION STATE INITIALIZATION
+# ============================================================
+
+session_defaults = {
+    "financial_summary": "",
+    "last_financial_answer": "",
+    "financial_pdf": None,
+    "mapped_financial_df": None,
+    "mapping_signature": None,
+    "mapping_success": False,
+    "risk_config": DEFAULT_RISK_CONFIG.copy(),
+}
+
+for key, default_value in session_defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
+
+
+# ============================================================
+# APPLICATION HEADER
+# ============================================================
+
+st.title("📊 InsightForge")
 st.subheader("Financial Intelligence Dashboard")
-st.write("Interactive analysis of financial receivables, risk and outstanding exposure.")
+st.write(
+    "Analyze receivables, identify financial risks, explore exposure, "
+    "and generate AI-assisted financial insights."
+)
 
 st.divider()
 
-st.header("Upload Financial Dataset")
 
-uploaded_file=st.file_uploader(
-    "Upload debtor/receivables data",
-    type=["csv","xlsx","xls"],
-    key="financial_upload"
+# ============================================================
+# DATASET UPLOAD AND PROCESSING
+# ============================================================
+
+st.header("1. Upload Financial Dataset")
+
+uploaded_file = st.file_uploader(
+    "Upload debtor or receivables data",
+    type=["csv", "xlsx", "xls"],
+    key="financial_upload",
 )
 
-if uploaded_file is not None:
-    try:
-        uploaded_file.seek(0)
-
-        if uploaded_file.name.lower().endswith(".csv"):
-            preview = pd.read_csv(
-                uploaded_file,
-                header=None,
-                nrows=30
-            )
-        else:
-            preview = pd.read_excel(
-                uploaded_file,
-                header=None,
-                nrows=30
-            )
-
-        detected_row = detect_header_row(preview)
-
-        if detected_row is not None:
-            st.success(
-                f"Suggested header row: {detected_row + 1}"
-            )
-            default_row = detected_row + 1
-        else:
-            st.warning(
-                "Could not confidently detect the header row. "
-                "Please select it manually."
-            )
-            default_row = 5
-
-        manual_override = st.checkbox(
-            "Choose header row manually",
-            value=detected_row is None
-        )
-
-        if manual_override:
-            header_row = st.number_input(
-                "Header row number",
-                min_value=1,
-                max_value=100,
-                value=default_row,
-                step=1,
-                help="Enter the spreadsheet row containing the column names."
-            )
-        else:
-            header_row = default_row
-
-        uploaded_file.seek(0)
-
-        if uploaded_file.name.lower().endswith(".csv"):
-            raw_df = pd.read_csv(
-                uploaded_file,
-                header=int(header_row) - 1
-            )
-        else:
-            raw_df = pd.read_excel(
-                uploaded_file,
-                header=int(header_row) - 1
-            )
-
-        raw_df.columns = [
-            str(column).replace("\u00a0", " ").strip()
-            for column in raw_df.columns
-        ]
-        raw_df = raw_df.dropna(how="all")
-
-        st.subheader("Uploaded Data Preview")
-        st.dataframe(raw_df.head(10), use_container_width=True)
-        st.caption(
-            f"Rows: {len(raw_df)} | Columns: {len(raw_df.columns)}"
-        )
-
-        
-        from upload_processor import detect_column_mapping
-
-        
-        detected_mapping = detect_column_mapping(raw_df.columns)
-
-        st.subheader("Column Mapping")
-        st.caption(
-            "Check the detected columns. Change a selection if a field "
-            "has been matched incorrectly."
-        )
-
-        required_fields = {
-            "Account_ID": "Account ID",
-            "Customer_Name": "Customer name",
-            "Outstanding_Amount": "Outstanding amount",
-        }
-
-        optional_fields = {
-            "Region": "Region (optional)",
-            "Account_Status": "Account status (optional)",
-        }
-
-        selected_mapping = {}
-        options = ["-- Select a column --"] + list(raw_df.columns)
-
-        for field, label in required_fields.items():
-            detected_column = detected_mapping.get(field)
-
-            default_index = (
-                options.index(detected_column)
-                if detected_column in options
-                else 0
-            )
-
-            selected_mapping[field] = st.selectbox(
-                label,
-                options=options,
-                index=default_index,
-                key=f"mapping_{field}",
-            )
-        
-        
-        optional_mapping = {}
-
-        for field, label in optional_fields.items():
-            detected_column = detected_mapping.get(field)
-
-            options = ["-- Not available --"] + list(raw_df.columns)
-
-            default_index = (
-                options.index(detected_column)
-                if detected_column in options
-                else 0
-            )
-
-            optional_mapping[field] = st.selectbox(
-                label,
-                options=options,
-                index=default_index,
-                key=f"optional_mapping_{field}",
-            )
-
-
-        mapping_complete = all(
-            selected_mapping[field] != "-- Select a column --"
-            for field in required_fields
-        )
-
-        if mapping_complete:
-            st.success("All required columns are mapped.")
-        else:
-            st.warning("Select a source column for every required field.")
-
-        apply_clicked = st.button(
-            "Process Dataset",
-            key="apply_column_mapping",
-            disabled=not mapping_complete,
-        )
-
-        # Process automatically when a new file or mapping is selected.
-        mapping_signature = tuple(
-            (field, selected_mapping[field])
-            for field in required_fields
-        )
-        current_signature = (
-            uploaded_file.name,
-            len(raw_df),
-            tuple(raw_df.columns),
-            mapping_signature,
-        )
-
-        st.session_state.pop("mapped_financial_df", None)
-        st.session_state.pop("mapping_signature", None)
-
-        
-        if apply_clicked and mapping_complete:
-            rename_mapping = {
-                source: target
-                for target, source in selected_mapping.items()
-            }
-
-            if len(set(rename_mapping)) != len(rename_mapping):
-                st.error(
-                    "Each required field must use a different source column."
-                )
-                st.stop()
-
-            
-            # Include optional mappings when the user selects a column.
-            for field, source in optional_mapping.items():
-                if source != "-- Not available --":
-                    rename_mapping[source] = field
-
-            mapped_df = raw_df.rename(columns=rename_mapping)
-
-            # Supply safe defaults when optional columns are absent.
-            if "Region" not in mapped_df.columns:
-                mapped_df["Region"] = "Unknown"
-
-            if "Account_Status" not in mapped_df.columns:
-                mapped_df["Account_Status"] = "Unknown"
-
-            try:
-                df = prepare_uploaded_data(mapped_df)
-                st.session_state["mapped_financial_df"] = df
-                st.session_state["mapping_signature"] = current_signature
-                st.session_state["mapping_success"] = True
-            except Exception as e:
-                st.session_state["mapping_success"] = False
-                st.error(f"Could not process mapped data: {e}")
-                st.stop()
-
-        if (
-            "mapped_financial_df" not in st.session_state
-            or st.session_state.get("mapping_signature") != current_signature
-        ):
-            st.info("Review the mappings and click Process Dataset.")
-            st.stop()
-
-        if st.session_state.get("mapping_success"):
-            st.success("Dataset processed successfully.")
-
-        df = st.session_state["mapped_financial_df"]
-
-
-    except Exception as e:
-        st.error(f"Could not process uploaded file: {e}")
-        st.stop()
-
-else:
+if uploaded_file is None:
     st.info("Upload a financial dataset to begin analysis.")
     st.stop()
 
-# Run anomaly detection on the active dataset
+
 try:
-    df, amount_threshold, ageing_threshold = perform_anomaly_analysis(df)
+    uploaded_file.seek(0)
 
-    st.success("Anomaly detection completed successfully.")
+    if uploaded_file.name.lower().endswith(".csv"):
+        preview = pd.read_csv(uploaded_file, header=None, nrows=30)
+    else:
+        preview = pd.read_excel(uploaded_file, header=None, nrows=30)
 
-except Exception as e:
-    st.error(f"Anomaly detection failed: {e}")
+    detected_row = detect_header_row(preview)
+
+    if detected_row is not None:
+        st.success(f"Suggested header row: {detected_row + 1}")
+        default_row = detected_row + 1
+    else:
+        st.warning(
+            "Could not confidently detect the header row. "
+            "Please select it manually."
+        )
+        default_row = min(5, max(1, len(preview)))
+
+    manual_override = st.checkbox(
+        "Choose header row manually",
+        value=detected_row is None,
+        key="manual_header_override",
+    )
+
+    if manual_override:
+        header_row = st.number_input(
+            "Header row number",
+            min_value=1,
+            max_value=100,
+            value=int(default_row),
+            step=1,
+            help="Enter the spreadsheet row containing the column names.",
+        )
+    else:
+        header_row = default_row
+
+    uploaded_file.seek(0)
+
+    if uploaded_file.name.lower().endswith(".csv"):
+        raw_df = pd.read_csv(uploaded_file, header=int(header_row) - 1)
+    else:
+        raw_df = pd.read_excel(uploaded_file, header=int(header_row) - 1)
+
+    raw_df.columns = [
+        str(column).replace("\u00a0", " ").strip()
+        for column in raw_df.columns
+    ]
+    raw_df = raw_df.dropna(how="all")
+
+    if raw_df.empty:
+        st.error("The selected header row produced an empty dataset.")
+        st.stop()
+
+    st.subheader("Uploaded Data Preview")
+    st.dataframe(raw_df.head(10), use_container_width=True)
+    st.caption(f"Rows: {len(raw_df):,} | Columns: {len(raw_df.columns):,}")
+
+    from upload_processor import detect_column_mapping
+
+    detected_mapping = detect_column_mapping(raw_df.columns)
+
+    st.subheader("Column Mapping")
+    st.caption(
+        "Review the automatically detected columns and change any "
+        "selection that is incorrect."
+    )
+
+    required_fields = {
+        "Account_ID": "Account ID",
+        "Customer_Name": "Customer name",
+        "Outstanding_Amount": "Outstanding amount",
+    }
+
+    optional_fields = {
+        "Region": "Region (optional)",
+        "Account_Status": "Account status (optional)",
+    }
+
+    selected_mapping = {}
+    options = ["-- Select a column --"] + list(raw_df.columns)
+
+    for field, label in required_fields.items():
+        detected_column = detected_mapping.get(field)
+
+        default_index = (
+            options.index(detected_column)
+            if detected_column in options
+            else 0
+        )
+
+        selected_mapping[field] = st.selectbox(
+            label,
+            options=options,
+            index=default_index,
+            key=f"mapping_{field}",
+        )
+
+    optional_mapping = {}
+    optional_options = ["-- Not available --"] + list(raw_df.columns)
+
+    for field, label in optional_fields.items():
+        detected_column = detected_mapping.get(field)
+
+        default_index = (
+            optional_options.index(detected_column)
+            if detected_column in optional_options
+            else 0
+        )
+
+        optional_mapping[field] = st.selectbox(
+            label,
+            options=optional_options,
+            index=default_index,
+            key=f"optional_mapping_{field}",
+        )
+
+    mapping_complete = all(
+        selected_mapping[field] != "-- Select a column --"
+        for field in required_fields
+    )
+
+    selected_required_sources = [
+        selected_mapping[field] for field in required_fields
+    ]
+
+    if len(set(selected_required_sources)) != len(selected_required_sources):
+        mapping_complete = False
+        st.warning(
+            "Each required field must map to a different source column."
+        )
+
+    selected_optional_sources = [
+        source for source in optional_mapping.values()
+        if source != "-- Not available --"
+    ]
+
+    if len(set(selected_optional_sources)) != len(selected_optional_sources):
+        mapping_complete = False
+        st.warning(
+            "An optional source column cannot be assigned to multiple fields."
+        )
+
+    if set(selected_required_sources).intersection(selected_optional_sources):
+        mapping_complete = False
+        st.warning(
+            "A source column cannot be used for both a required and "
+            "an optional field."
+        )
+
+    if mapping_complete:
+        st.success("Required columns are mapped.")
+    else:
+        st.warning("Please correct the column mapping before processing.")
+
+    mapping_signature = (
+        uploaded_file.name,
+        getattr(uploaded_file, "size", None),
+        int(header_row),
+        tuple(raw_df.columns),
+        tuple(selected_mapping.items()),
+        tuple(optional_mapping.items()),
+    )
+
+    apply_clicked = st.button(
+        "Process Dataset",
+        key="apply_column_mapping",
+        disabled=not mapping_complete,
+        type="primary",
+    )
+
+    if apply_clicked and mapping_complete:
+        rename_mapping = {
+            source: target
+            for target, source in selected_mapping.items()
+        }
+
+        for field, source in optional_mapping.items():
+            if source != "-- Not available --":
+                rename_mapping[source] = field
+
+        mapped_df = raw_df.rename(columns=rename_mapping).copy()
+
+        if "Region" not in mapped_df.columns:
+            mapped_df["Region"] = "Unknown"
+
+        if "Account_Status" not in mapped_df.columns:
+            mapped_df["Account_Status"] = "Unknown"
+
+        try:
+            risk_config = st.session_state.get(
+                "risk_config",
+                DEFAULT_RISK_CONFIG.copy(),
+            )
+
+            processed_df = prepare_uploaded_data(
+                mapped_df,
+                risk_config=risk_config,
+            )
+
+            st.session_state["mapped_financial_df"] = processed_df
+            st.session_state["mapping_signature"] = mapping_signature
+            st.session_state["mapping_success"] = True
+            st.session_state["financial_summary"] = ""
+            st.session_state["last_financial_answer"] = ""
+            st.session_state["financial_pdf"] = None
+
+            st.success(
+                f"Dataset processed successfully! "
+                f"{len(processed_df):,} accounts analyzed."
+            )
+
+        except Exception as error:
+            st.session_state["mapping_success"] = False
+            st.error(f"Could not process mapped data: {error}")
+            st.stop()
+
+    if (
+        st.session_state["mapped_financial_df"] is None
+        or st.session_state["mapping_signature"] != mapping_signature
+    ):
+        st.info("Review the mappings and click Process Dataset.")
+        st.stop()
+
+    df = st.session_state["mapped_financial_df"].copy()
+
+except Exception as error:
+    st.error(f"Could not read or process the uploaded file: {error}")
     st.stop()
 
-context=create_financial_context(df)
-financial_data=json.dumps(context,indent=2)
+
+# ============================================================
+# RISK THRESHOLD CONTROLS
+# ============================================================
+
+st.sidebar.title("InsightForge Controls")
+st.sidebar.header("Risk Thresholds")
+
+saved_config = st.session_state.get(
+    "risk_config",
+    DEFAULT_RISK_CONFIG.copy(),
+)
+
+with st.sidebar.expander("Ageing thresholds (days)", expanded=True):
+    ageing_medium = st.slider(
+        "Medium ageing threshold",
+        min_value=1,
+        max_value=90,
+        value=int(saved_config["ageing_medium"]),
+        key="ageing_medium_slider",
+    )
+
+    ageing_high = st.slider(
+        "High ageing threshold",
+        min_value=ageing_medium + 1,
+        max_value=180,
+        value=min(
+            180,
+            max(int(saved_config["ageing_high"]), ageing_medium + 1),
+        ),
+        key="ageing_high_slider",
+    )
+
+    ageing_critical = st.slider(
+        "Critical ageing threshold",
+        min_value=ageing_high + 1,
+        max_value=365,
+        value=min(
+            365,
+            max(int(saved_config["ageing_critical"]), ageing_high + 1),
+        ),
+        key="ageing_critical_slider",
+    )
+
+with st.sidebar.expander("Exposure thresholds (₹)", expanded=True):
+    exposure_low = st.number_input(
+        "Low exposure threshold (₹)",
+        min_value=0,
+        value=int(saved_config["exposure_low"]),
+        step=10000,
+        key="exposure_low_input",
+    )
+
+    exposure_medium = st.number_input(
+        "Medium exposure threshold (₹)",
+        min_value=1,
+        value=int(saved_config["exposure_medium"]),
+        step=10000,
+        key="exposure_medium_input",
+    )
+
+    exposure_high = st.number_input(
+        "High exposure threshold (₹)",
+        min_value=1,
+        value=int(saved_config["exposure_high"]),
+        step=10000,
+        key="exposure_high_input",
+    )
+
+if not (exposure_low < exposure_medium < exposure_high):
+    st.sidebar.error(
+        "Set exposure thresholds in increasing order: "
+        "Low < Medium < High."
+    )
+    st.stop()
+
+risk_config = {
+    "ageing_medium": ageing_medium,
+    "ageing_high": ageing_high,
+    "ageing_critical": ageing_critical,
+    "exposure_low": exposure_low,
+    "exposure_medium": exposure_medium,
+    "exposure_high": exposure_high,
+}
+
+st.session_state["risk_config"] = risk_config
+
+try:
+    df = perform_risk_analysis(
+        st.session_state["mapped_financial_df"].copy(),
+        config=risk_config,
+    )
+
+    df, amount_threshold, ageing_threshold = perform_anomaly_analysis(df)
+
+    st.session_state["mapped_financial_df"] = df
+
+except Exception as error:
+    st.error(f"Financial risk or anomaly analysis failed: {error}")
+    st.stop()
+
+
+# ============================================================
+# FINANCIAL CONTEXT AND SUMMARY VALUES
+# ============================================================
+
+try:
+    context = create_financial_context(df)
+    financial_data = json.dumps(context, indent=2, default=str)
+except Exception as error:
+    st.error(f"Could not prepare the financial context: {error}")
+    st.stop()
+
+total_accounts = len(df)
+total_outstanding = df["Outstanding_Amount"].sum()
+
+high_risk = int((df["Risk_Category"] == "High").sum())
+medium_risk = int((df["Risk_Category"] == "Medium").sum())
+low_risk = int((df["Risk_Category"] == "Low").sum())
+
+
+# ============================================================
+# FINANCIAL SUMMARY
+# ============================================================
 
 st.divider()
-
 st.header("Financial Summary")
 
-total_accounts=len(df)
-total_outstanding=df["Outstanding_Amount"].sum()
-high_risk=(df["Risk_Category"]=="High").sum()
-medium_risk=(df["Risk_Category"]=="Medium").sum()
-low_risk=(df["Risk_Category"]=="Low").sum()
-
-col1,col2,col3,col4=st.columns(4)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Total Accounts",total_accounts)
+    st.metric("Total Accounts", f"{total_accounts:,}")
 
 with col2:
-    st.metric("Total Outstanding",f"₹{total_outstanding:,.0f}")
+    st.metric("Total Outstanding", format_inr(total_outstanding))
 
 with col3:
-    st.metric("High Risk Accounts",high_risk)
+    st.metric("High-Risk Accounts", f"{high_risk:,}")
 
 with col4:
-    st.metric("Medium Risk Accounts",medium_risk)
+    st.metric("Medium-Risk Accounts", f"{medium_risk:,}")
 
-st.caption(f"Low Risk Accounts: {low_risk}")
-
-st.divider()
-
-st.header("Risk Overview")
-
-col1,col2=st.columns(2)
-
-with col1:
-    st.plotly_chart(risk_category_chart(df),use_container_width=True)
-
-with col2:
-    st.plotly_chart(risk_exposure_chart(df),use_container_width=True)
-
-col1,col2=st.columns(2)
-
-with col1:
-    st.plotly_chart(risk_score_chart(df),use_container_width=True)
-
-with col2:
-    st.plotly_chart(ageing_distribution_chart(df),use_container_width=True)
+st.caption(f"Low-Risk Accounts: {low_risk:,}")
 
 st.divider()
 
-st.header("Exposure Analysis")
 
-col1,col2=st.columns(2)
+# ============================================================
+# MAIN DASHBOARD TABS
+# ============================================================
 
-with col1:
-    st.plotly_chart(top_exposure_chart(df),use_container_width=True)
-
-with col2:
-    st.plotly_chart(regional_exposure_chart(df),use_container_width=True)
-
-st.plotly_chart(regional_risk_chart(df),use_container_width=True)
-
-st.divider()
-
-st.header("AI-Generated Financial Insights")
-
-if st.button("Generate Financial Insights"):
-    with st.spinner("Generating financial insights..."):
-        try:
-            insight=generate_financial_summary(financial_data)
-            st.write(insight)
-        except Exception as e:
-            st.error(f"Unable to generate financial insights: {e}")
-
-st.divider()
-
-st.header("High-Risk Accounts")
-
-high_risk_accounts=df[df["Risk_Category"]=="High"].sort_values(
-    by="Risk_Score",
-    ascending=False
+analytics_tab, ai_tab, data_tab, reports_tab = st.tabs(
+    [
+        "📊 Risk & Exposure",
+        "🤖 AI Assistant",
+        "📋 Data & Quality",
+        "📥 Reports & Downloads",
+    ]
 )
 
-display_columns=[
-    "Account_ID",
-    "Customer_Name",
-    "Outstanding_Amount",
-    "Ageing_Days",
-    "Risk_Score",
-    "Risk_Category",
-    "Risk_Reason"
-]
 
-st.dataframe(
-    high_risk_accounts[display_columns],
-    use_container_width=True
-)
+# ============================================================
+# TAB 1: RISK AND EXPOSURE ANALYTICS
+# ============================================================
 
-st.divider()
+with analytics_tab:
+    st.header("Risk Overview")
 
-st.header("Account-Level Data")
+    col1, col2 = st.columns(2)
 
-st.dataframe(df,use_container_width=True)
+    with col1:
+        st.plotly_chart(
+            risk_category_chart(df),
+            use_container_width=True,
+        )
 
-st.divider()
+    with col2:
+        st.plotly_chart(
+            risk_exposure_chart(df),
+            use_container_width=True,
+        )
 
-st.header("Ask InsightForge")
+    col1, col2 = st.columns(2)
 
-question=st.text_input("Ask a financial question")
+    with col1:
+        st.plotly_chart(
+            risk_score_chart(df),
+            use_container_width=True,
+        )
 
-if st.button("Ask InsightForge"):
-    if question.strip():
-        with st.spinner("Analyzing financial data..."):
-            try:
-                answer=answer_financial_question(question,financial_data)
-                st.write(answer)
-            except Exception as e:
-                st.error(f"Unable to answer your question: {e}")
+    with col2:
+        st.plotly_chart(
+            ageing_distribution_chart(df),
+            use_container_width=True,
+        )
+
+    st.divider()
+    st.header("Exposure Analysis")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.plotly_chart(
+            top_exposure_chart(df),
+            use_container_width=True,
+        )
+
+    with col2:
+        st.plotly_chart(
+            regional_exposure_chart(df),
+            use_container_width=True,
+        )
+
+    st.subheader("Regional Risk")
+    st.plotly_chart(
+        regional_risk_chart(df),
+        use_container_width=True,
+    )
+
+    st.divider()
+    st.header("High-Risk Accounts")
+
+    high_risk_accounts = df[
+        df["Risk_Category"] == "High"
+    ].copy()
+
+    if "Risk_Score" in high_risk_accounts.columns:
+        high_risk_accounts = high_risk_accounts.sort_values(
+            by="Risk_Score",
+            ascending=False,
+        )
+
+    display_columns = safe_columns(
+        high_risk_accounts,
+        [
+            "Account_ID",
+            "Customer_Name",
+            "Outstanding_Amount",
+            "Ageing_Days",
+            "Risk_Score",
+            "Risk_Category",
+            "Risk_Reason",
+        ],
+    )
+
+    if high_risk_accounts.empty:
+        st.info(
+            "No high-risk accounts identified under the current thresholds."
+        )
     else:
-        st.warning("Please enter a question.")
+        st.dataframe(
+            high_risk_accounts[display_columns],
+            use_container_width=True,
+        )
 
+
+# ============================================================
+# TAB 2: AI INSIGHTS AND FINANCIAL QUESTIONS
+# ============================================================
+
+with ai_tab:
+    st.header("AI-Generated Financial Insights")
+
+    st.write(
+        "Generate a narrative summary of the analyzed portfolio using "
+        "the validated financial context."
+    )
+
+    if st.button(
+        "Generate Financial Insights",
+        key="generate_financial_insights",
+        type="primary",
+    ):
+        with st.spinner("Generating financial insights..."):
+            try:
+                insight = generate_financial_summary(financial_data)
+
+                if insight:
+                    st.session_state["financial_summary"] = insight
+                else:
+                    st.warning("The AI returned an empty summary.")
+
+            except Exception:
+                st.warning(
+                    "AI insights are temporarily unavailable. "
+                    "Your financial analysis is still available. "
+                    "Please try again shortly."
+                )
+
+    if st.session_state.get("financial_summary"):
+        st.subheader("Financial Insights")
+        st.markdown(st.session_state["financial_summary"])
+
+    st.divider()
+    st.header("Ask InsightForge")
+
+    question = st.text_input(
+        "Ask a question about your financial data",
+        placeholder=(
+            "Example: Which region has the highest outstanding exposure?"
+        ),
+        key="financial_question",
+    )
+
+    if st.button("Ask InsightForge", key="ask_insightforge"):
+        if question.strip():
+            with st.spinner("Analyzing financial data..."):
+                try:
+                    answer = answer_financial_question(
+                        question.strip(),
+                        financial_data,
+                    )
+                    st.session_state["last_financial_answer"] = answer
+
+                except Exception:
+                    st.error(
+                        "Unable to answer your question right now. "
+                        "Please try again shortly."
+                    )
+        else:
+            st.warning("Please enter a question.")
+
+    if st.session_state.get("last_financial_answer"):
+        st.subheader("Answer")
+        st.write(st.session_state["last_financial_answer"])
+
+    st.caption(
+        "AI-generated text is intended to support interpretation. "
+        "Use the analyzed dataset and verified calculations as the "
+        "source of financial figures."
+    )
+
+
+# ============================================================
+# TAB 3: DATA TABLES AND QUALITY CHECKS
+# ============================================================
+
+with data_tab:
+    st.header("Dataset Overview")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Total Records", f"{len(df):,}")
+
+    with col2:
+        st.metric("Total Columns", f"{len(df.columns):,}")
+
+    with col3:
+        st.metric("High-Risk Accounts", f"{high_risk:,}")
+
+    st.divider()
+    st.header("Data Quality Check")
+
+    quality_columns = safe_columns(
+        df,
+        [
+            "Account_ID",
+            "Customer_Name",
+            "Outstanding_Amount",
+            "Ageing_Days",
+            "Risk_Category",
+        ],
+    )
+
+    missing_values = df[quality_columns].isna().sum()
+    total_missing = int(missing_values.sum())
+
+    negative_amounts = df[df["Outstanding_Amount"] < 0]
+
+    if total_missing == 0 and negative_amounts.empty:
+        st.success(
+            "Data quality check passed — no missing values in key fields "
+            "or negative outstanding amounts detected."
+        )
+    else:
+        st.warning(
+            "Data review recommended. Review the checks below before "
+            "interpreting the results."
+        )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Missing Values")
+
+        if total_missing == 0:
+            st.success("No missing values found in the checked fields.")
+        else:
+            st.warning(f"{total_missing:,} missing values detected.")
+
+            st.dataframe(
+                missing_values[missing_values > 0].rename(
+                    "Missing Values"
+                ).to_frame(),
+                use_container_width=True,
+            )
+
+    with col2:
+        st.subheader("Negative Outstanding Amounts")
+
+        if negative_amounts.empty:
+            st.success("No negative outstanding amounts found.")
+        else:
+            st.warning(
+                f"{len(negative_amounts):,} records have negative "
+                "outstanding amounts."
+            )
+
+            negative_columns = safe_columns(
+                negative_amounts,
+                [
+                    "Account_ID",
+                    "Customer_Name",
+                    "Outstanding_Amount",
+                ],
+            )
+
+            st.dataframe(
+                negative_amounts[negative_columns],
+                use_container_width=True,
+            )
+
+    st.caption(
+        "Negative balances may represent legitimate credits or refunds. "
+        "Review them rather than automatically treating them as errors."
+    )
+
+    st.divider()
+    st.header("All Account-Level Data")
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+    )
+
+
+# ============================================================
+# TAB 4: REPORTS AND DOWNLOADS
+# ============================================================
+
+with reports_tab:
+    st.header("Reports & Downloads")
+
+    st.write(
+        "Generate an executive PDF report or export the analyzed "
+        "dataset and anomaly details."
+    )
+
+    st.divider()
+    st.subheader("Executive PDF Report")
+
+    if st.button(
+        "Generate PDF Report",
+        key="generate_pdf_report",
+        type="primary",
+    ):
+        try:
+            pdf_bytes = generate_financial_report(
+                df=df,
+                summary_text=st.session_state.get("financial_summary", ""),
+            )
+
+            st.session_state["financial_pdf"] = pdf_bytes
+            st.success("PDF report generated successfully.")
+
+        except Exception as error:
+            st.session_state["financial_pdf"] = None
+            st.error(f"Could not generate PDF report: {error}")
+
+    if st.session_state.get("financial_pdf") is not None:
+        st.download_button(
+            label="Download PDF Report",
+            data=st.session_state["financial_pdf"],
+            file_name="InsightForge_Financial_Report.pdf",
+            mime="application/pdf",
+            key="download_pdf_report",
+        )
+
+    st.divider()
+    st.subheader("Risk Analysis (CSV)")
+
+    risk_csv = df.to_csv(index=False).encode("utf-8-sig")
+
+    st.download_button(
+        label="Download Risk Analysis (CSV)",
+        data=risk_csv,
+        file_name="risk_analysis.csv",
+        mime="text/csv",
+        key="download_risk_csv",
+    )
+
+    st.divider()
+    st.subheader("Anomaly Analysis (JSON)")
+
+    anomaly_columns = safe_columns(
+        df,
+        [
+            "Account_ID",
+            "Customer_Name",
+            "Outstanding_Amount",
+            "Ageing_Days",
+            "Anomaly_Score",
+            "Anomaly_Type",
+            "Anomaly_Category",
+            "Anomaly_Reason",
+        ],
+    )
+
+    anomaly_json = df[anomaly_columns].to_json(
+        orient="records",
+        indent=2,
+    ).encode("utf-8")
+
+    st.download_button(
+        label="Download Anomaly Analysis (JSON)",
+        data=anomaly_json,
+        file_name="anomaly_analysis.json",
+        mime="application/json",
+        key="download_anomaly_json",
+    )
+
+    st.caption(
+        "Exports contain the results of the currently analyzed dataset "
+        "and risk thresholds."
+    )
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
 st.caption("InsightForge — Hybrid Financial Intelligence System")

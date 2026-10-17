@@ -1,354 +1,85 @@
 # InsightForge
 
-<<<<<<< HEAD
-## Hybrid Financial Intelligence System
+**Hybrid Financial Intelligence System**
 
-InsightForge is a hybrid financial intelligence system designed to analyze financial receivables and debtor information using deterministic data processing and AI-based interpretation.
+InsightForge analyzes financial receivables and debtor data using deterministic Python calculations and AI-assisted interpretation. It combines validated financial metrics, risk indicators, anomaly detection, interactive visualizations, and natural-language insights in a Streamlit dashboard.
 
-The system combines Python-based financial calculations with the Google Gemini Large Language Model to provide reliable financial analysis, risk identification, anomaly detection, interactive visualizations and natural-language financial insights.
+> **Core principle:** Compute deterministically. Interpret intelligently.
 
-## Problem Statement
+## Problem and approach
 
-Large financial spreadsheets can contain a large number of records and multiple financial attributes. Manually analyzing these datasets can be time-consuming and may make it difficult to identify important risk patterns, ageing issues and exposure concentrations.
+Large financial spreadsheets can be difficult to review manually. InsightForge processes and validates financial data before passing structured results to Google Gemini for interpretation. Python remains responsible for financial calculations; the language model explains the validated results rather than acting as the source of financial figures.
 
-General-purpose AI systems may also struggle with large datasets and financial calculations.
+## Key features
 
-InsightForge addresses this problem by separating numerical processing from AI interpretation.
+- Upload and process financial datasets.
+- Detect and map common financial column names.
+- Validate records and prepare normalized account-level data.
+- Calculate financial KPIs and ageing metrics.
+- Classify account risk using ageing and exposure indicators.
+- Flag unusual exposure and ageing patterns.
+- Analyze regional exposure and risk.
+- Explore interactive charts and account-level tables.
+- Generate AI-assisted financial summaries.
+- Ask natural-language questions about the analyzed portfolio.
+- Export structured analysis results as CSV and JSON.
 
-Python is used for reliable data processing, financial calculations, validation and risk analysis, while Gemini is used to interpret validated results and generate natural-language insights.
-
-## Objectives
-
-- Process financial debtor data efficiently
-- Clean and validate financial records
-- Calculate financial KPIs
-- Identify high-risk accounts
-- Detect unusual exposure and ageing patterns
-- Analyze regional exposure
-- Generate financial visualizations
-- Generate AI-based financial insights
-- Support natural-language financial questions
-- Provide an interactive Streamlit dashboard
-- Maintain separation between deterministic calculations and AI interpretation
-
-## System Architecture
+## Architecture
 
 ```text
 Financial Dataset
        |
        v
-Data Cleaning & Validation
+Upload, Header Detection & Column Mapping
        |
        v
-Financial Calculations
+Cleaning and Validation
        |
        v
-Validated Financial Data
+Financial Metrics and Structured Data
        |
-       +----------------------+
-       |                      |
-       v                      v
-Risk & Anomaly Analysis    Financial Context
-                              |
-                              v
-                         Gemini AI
-                              |
-                    +---------+---------+
-                    |                   |
-                    v                   v
-              AI Insights          Q&A System
-                    |                   |
-                    +---------+---------+
-                              |
-                              v
-                     Streamlit Dashboard
-Technologies Used
-Python
-Pandas
-NumPy
-Streamlit
-Plotly
-Google Gemini API
-google-genai
-python-dotenv
-JSON
-Git/GitHub
-Dataset
-
-The project uses a debtor/receivables dataset containing account-level financial information.
-
-The dataset includes fields such as:
-
-Account ID
-Customer Name
-Outstanding Amount
-Ageing Days
-Account Status
-Region
-
-The current development version uses a sample debtor dataset for testing and demonstration.
-
-Data Processing
-
-The financial analytics layer processes the dataset before the information is passed to the AI layer.
-
-The processing includes:
-
-Data loading
-Data type validation
-Missing value handling
-Duplicate handling
-Financial calculations
-KPI generation
-Ageing analysis
-Regional analysis
-Data validation
-Structured output generation
-
-The validated financial results are stored in structured CSV and JSON outputs.
-
-Risk Detection
-
-InsightForge uses deterministic rules to calculate risk indicators.
-
-Risk is based on two primary components:
-
-Ageing Score
-Exposure Score
-Ageing Score
-Ageing Days	Score
-90 or more	3
-60-89	2
-30-59	1
-Below 30	0
-Exposure Score
-Outstanding Amount	Score
-₹5,00,000 or more	3
-₹3,00,000-₹4,99,999	2
-₹1,00,000-₹2,99,999	1
-Below ₹1,00,000	0
-
-The total risk score is calculated as:
-
-Risk Score = Ageing Score + Exposure Score
-Risk Categories
-Risk Score	Risk Category
-5 or more	High
-3-4	Medium
-Below 3	Low
-
-The risk classification is performed using Python before the data is provided to the AI layer.
-
-Anomaly Detection
-
-InsightForge also identifies unusual financial records using percentile-based thresholds.
-
-The anomaly detection process examines:
-
-Outstanding amount
-Ageing days
-
-Records that exceed the calculated thresholds receive anomaly indicators.
-
-The anomaly score is based on the number of unusual conditions detected.
-
-Anomaly Score 0 → Normal
-Anomaly Score 1 → Medium
-Anomaly Score 2 → High
-Financial Context
-
-Before sending information to Gemini, InsightForge creates a structured financial context.
-
-The context includes:
-
-Total number of accounts
-Total outstanding exposure
-High-risk account count
-Medium-risk account count
-Low-risk account count
-Overdue account count
-90+ day ageing account count
-High-risk exposure
-Medium-risk exposure
-Low-risk exposure
-Regional exposure
-Top exposure accounts
-Account-level validated information
-
-This structured approach reduces the possibility of the AI inventing financial values.
-
-AI Layer
-
-Google Gemini is used as the natural-language intelligence layer of InsightForge.
-
-The AI layer provides:
-
-Financial portfolio summaries
-Risk explanations
-Exposure observations
-Ageing observations
-Regional observations
-Natural-language question answering
-
-The AI does not replace the deterministic financial calculation layer.
-
-Instead, validated financial results are generated by Python and then provided to Gemini for interpretation.
-
-Prompt Design
-
-The prompts instruct the AI to:
-
-Use only the supplied validated financial information
-Preserve the supplied financial values
-Use Indian Rupee (₹)
-Avoid converting values into other currencies
-Avoid inventing financial figures
-Avoid unsupported assumptions
-Clearly distinguish observations from assumptions
-Provide professional financial explanations
-
-This design helps maintain consistency between the calculated results and the generated AI report.
-
-AI-Generated Financial Insights
-
-InsightForge can generate a professional financial portfolio analysis report containing sections such as:
-
-Executive Summary
-Portfolio Overview
-Risk Patterns
-Ageing Patterns
-Exposure Concentrations
-Regional Exposure
-Conclusion
-
-The report is generated using validated financial context.
-
-The reporting date is generated by Python and passed to the AI rather than being generated independently by the language model.
-
-Natural-Language Q&A
-
-Users can ask financial questions directly through the Streamlit dashboard.
-
-Examples include:
-
-Which account has the highest outstanding amount?
-Which region has the highest outstanding exposure?
-How many high-risk accounts are there?
-What is the total high-risk exposure?
-Which accounts have ageing above 90 days?
-
-The questions are answered using the validated financial context.
-
-If the required information is unavailable, the AI is instructed to state that it is unavailable instead of inventing an answer.
-
-Dashboard
-
-The Streamlit dashboard provides an interactive interface for financial analysis.
-
-Dashboard Features
-Total account count
-Total outstanding amount
-High-risk account count
-Medium-risk account count
-Risk distribution chart
-Risk exposure chart
-Risk score chart
-Ageing distribution chart
-Top exposure accounts chart
-Regional exposure chart
-Regional risk chart
-High-risk account table
-Account-level data table
-AI-generated financial insights
-Natural-language Q&A
-Visualizations
-
-Plotly is used to create interactive charts.
-
-The dashboard includes visualizations for:
-
-Risk Analysis
-Risk category distribution
-Risk exposure
-Risk score distribution
-Ageing distribution
-Exposure Analysis
-Top exposure accounts
-Regional exposure
-Regional risk
-
-These visualizations allow users to identify important financial patterns quickly.
-
-Sample Portfolio Results
-
-For the current sample dataset, the validated analysis produces:
-
-Total accounts: 20
-Total outstanding: ₹7,640,000
-High-risk accounts: 7
-Medium-risk accounts: 5
-Low-risk accounts: 8
-High-risk exposure: ₹5,220,000
-Medium-risk exposure: ₹1,570,000
-Low-risk exposure: ₹850,000
-Accounts with 90+ days ageing: 7
-Overdue accounts: 7
-Regional Exposure
-West: ₹2,560,000
-South: ₹2,065,000
-East: ₹1,940,000
-North: ₹1,075,000
-Top Exposure Accounts
-
-The current sample dataset identifies the following five accounts as the highest exposure accounts:
-
-Account ID	Customer Name	Outstanding Amount	Ageing Days	Risk Category
-A020	Global Tech	₹1,100,000	180	High
-A009	Vertex Systems	₹920,000	150	High
-A001	Alpha Traders	₹850,000	120	High
-A015	Galaxy Exports	₹720,000	110	High
-A005	Epsilon Corp	₹650,000	105	High
-Hybrid AI Approach
-
-The main design principle of InsightForge is the separation of computation and interpretation.
-
-Python Layer
-
-Python is responsible for:
-
-Data loading
-Data cleaning
-Data validation
-Financial calculations
-KPI generation
-Risk scoring
-Anomaly detection
-Regional analysis
-Ageing analysis
-Structured financial context
-AI Layer
-
-Gemini is responsible for:
-
-Natural-language interpretation
-Financial summaries
-Risk explanations
-Financial observations
-Natural-language question answering
-
-This architecture allows the system to use deterministic processing for financial calculations while using AI for flexible human-readable explanations.
-
-Project Structure
+       +---------------------------+
+       |                           |
+       v                           v
+Risk and Anomaly Analysis    Financial Context
+                                   |
+                                   v
+                              Google Gemini
+                                   |
+                         +---------+---------+
+                         |                   |
+                         v                   v
+                    AI Insights          Financial Q&A
+                         |                   |
+                         +---------+---------+
+                                   |
+                                   v
+                          Streamlit Dashboard
+```
+
+## Technology stack
+
+| Area            | Technology                         |
+| --------------- | ---------------------------------- |
+| Language        | Python                             |
+| Data processing | Pandas, NumPy                      |
+| Dashboard       | Streamlit                          |
+| Visualization   | Plotly                             |
+| AI              | Google Gemini API (`google-genai`) |
+| Configuration   | `python-dotenv`                    |
+| Data exchange   | CSV, JSON                          |
+| Version control | Git, GitHub                        |
+
+## Project structure
+
+```text
 InsightForge/
-│
 ├── .env
 ├── .gitignore
 ├── requirements.txt
 ├── README.md
-│
 ├── data/
 │   └── dummy_debtors.csv
-│
 ├── ai/
 │   ├── __init__.py
 │   ├── risk_detection.py
@@ -358,418 +89,188 @@ InsightForge/
 │   ├── financial_context.py
 │   ├── test_llm.py
 │   └── test_qa.py
-│
 ├── dashboard/
-│   ├── __init__.py
 │   ├── app.py
+│   ├── upload_processor.py
 │   └── visualizations.py
-│
 └── outputs/
     ├── risk_analysis.csv
     ├── risk_analysis.json
     ├── anomaly_analysis.csv
     └── anomaly_analysis.json
-Installation
-
-Clone or download the InsightForge project.
-
-Install the required Python packages:
-
-pip install -r requirements.txt
-Gemini API Configuration
-
-Create a .env file in the main InsightForge folder.
-
-Add:
-
-GEMINI_API_KEY=your_api_key_here
-
-The API key should not be included directly in Python source code.
-
-The .env file should not be committed to GitHub.
-
-Running the Application
-
-Open a terminal in the main InsightForge folder.
-
-Run:
-
-streamlit run dashboard/app.py
-
-The Streamlit application will open in the browser.
-
-Testing the AI Layer
-
-The financial summary can be tested using:
-
-cd ai
-python test_llm.py
-
-Natural-language Q&A can be tested using:
-
-python test_qa.py
-Testing the Dashboard
-
-The dashboard should be checked for:
-
-Successful CSV loading
-Correct KPI values
-Correct risk categories
-Correct exposure values
-Correct charts
-Correct high-risk account table
-Successful AI-generated insights
-Successful natural-language Q&A
-Graceful handling of temporary Gemini API errors
-Error Handling
-
-The AI layer includes handling for temporary Gemini service errors.
-
-If the Gemini service returns a temporary 503 UNAVAILABLE error, InsightForge retries the request and displays a user-friendly message if the service remains unavailable.
-
-This prevents a temporary AI service issue from crashing the dashboard.
-
-Security
-
-The Gemini API key is stored in the .env file.
-
-The .gitignore file prevents the .env file from being committed to Git.
-
-Example .gitignore:
-
-.env
-__pycache__/
-*.pyc
-
-API keys should never be shared publicly or uploaded to GitHub.
-
-Testing Results
-Test Case	Expected Result	Status
-Load financial data	Dataset loads successfully	Pass
-Data validation	Required financial fields are validated	Pass
-Risk classification	High/Medium/Low categories generated	Pass
-Risk scoring	Risk scores generated correctly	Pass
-Anomaly detection	Anomaly indicators generated	Pass
-Risk charts	Charts displayed correctly	Pass
-Exposure charts	Exposure visualizations displayed	Pass
-Regional analysis	Regional exposure displayed	Pass
-Dashboard loading	Streamlit dashboard opens	Pass
-AI summary	Gemini generates financial summary	Pass
-Currency handling	Monetary values displayed in ₹	Pass
-Natural-language Q&A	Questions answered using validated context	Pass
-API error handling	Temporary API errors handled gracefully	Pass
-Account-level analysis	Account information displayed	Pass
-Student Contributions
-Student 1 — Shreeyanshi
-
-Contribution:
-
-Dataset ingestion
-Data cleaning and preprocessing
-Missing value handling
-Duplicate handling
-Financial calculations
-KPI generation
-Regional analysis
-Ageing analysis
-Data validation
-Structured JSON output
-Calculation accuracy testing
-Student 2 — Abha Kiran Dongre
-
-Contribution:
-
-Risk indicators
-High-risk account identification
-Anomaly detection
-Gemini API integration
-Prompt engineering
-Validated financial context integration
-AI-generated financial insights
-Natural-language Q&A
-Streamlit dashboard
-Plotly visualizations
-AI and application-layer integration
-AI error handling
-Testing of AI outputs against validated financial data
-Conclusion
-
-InsightForge demonstrates a hybrid approach to financial intelligence by combining deterministic data processing with generative AI.
-
-The system first processes and validates financial information using Python. Risk indicators, financial metrics, ageing analysis and exposure analysis are calculated before the information is provided to the AI layer.
-
-Gemini then interprets these validated results and generates natural-language financial insights and answers to user questions.
-
-The Streamlit dashboard brings the complete workflow together by providing interactive visualizations, financial risk information, AI-generated reports and natural-language interaction in a single application.
-
-Future Enhancements
-
-Potential future improvements include:
-
-Support for larger Excel workbooks
-Automated advanced data cleaning
-More financial KPIs
-Historical trend analysis
-More advanced anomaly detection
-Automated financial alerts
-PDF financial report generation
-User authentication
-Role-based access
-Database integration
-More advanced natural-language query processing
-Deployment to a cloud platform
-Integration with live financial systems
-Authors
-Student 1
-
-Shreeyanshi
-
-Financial Analytics & Data Engineering
-
-Student 2
-
-Abha Kiran Dongre
-
-AI, Risk & Application Layer
-
-InsightForge — Hybrid Financial Intelligence System
-=======
-### AI-Powered Financial Intelligence and Analysis System
-
-InsightForge is a hybrid financial intelligence platform that transforms large financial datasets into **reliable financial analysis and actionable insights**.
-
-It combines **deterministic data processing and financial computation** with **AI-powered interpretation**, ensuring that financial calculations remain accurate and verifiable while allowing users to interact with the results naturally.
-
-> **Compute deterministically. Interpret intelligently.**
-
----
-
-## 🎯 Problem
-
-Large financial spreadsheets can be difficult and time-consuming to analyse manually. Extracting meaningful patterns, identifying risks, and generating useful insights from raw financial data often requires significant effort.
-
-General-purpose AI systems can assist with interpretation, but relying on them directly for financial calculations may produce results that are difficult to verify.
-
-InsightForge addresses this by separating **financial computation from AI interpretation**.
-
----
-
-## 💡 Solution
-
-InsightForge follows a hybrid approach:
-
-**Financial Data → Processing → Validation → Analysis → Structured Results → AI Interpretation → Insights**
-
-### Financial Analytics
-
-The deterministic analytics layer handles:
-
-- Data ingestion and preprocessing
-- Data cleaning
-- Financial KPI calculation
-- Debtor ageing analysis
-- Regional exposure analysis
-- Financial validation and reconciliation
-- Structured JSON output generation
-
-### AI Intelligence
-
-The AI layer handles:
-
-- Risk analysis
-- Anomaly detection
-- Natural-language financial insights
-- Financial summaries
-- Natural-language queries
-- AI-assisted interpretation of validated results
-
-This approach allows the AI to work with **validated financial results instead of performing critical calculations itself**.
-
----
-
-## 🏗️ Architecture
-
-```text
-              Financial Dataset
-                     │
-                     ▼
-              Data Ingestion
-                     │
-                     ▼
-            Data Cleaning
-                     │
-                     ▼
-          Validation & Checks
-                     │
-                     ▼
-         Financial Analytics
-          ┌──────────┼──────────┐
-          ▼          ▼          ▼
-        KPIs      Ageing     Regional
-                  Analysis    Analysis
-          └──────────┼──────────┘
-                     ▼
-              Structured JSON
-                     │
-                     ▼
-                 AI Layer
-          ┌──────────┼──────────┐
-          ▼          ▼          ▼
-        Risk      Insights      Q&A
-       Analysis
-                     │
-                     ▼
-             Streamlit Dashboard
 ```
 
----
+This tree reflects the current documented application structure. New modules should be added here when they are implemented.
 
-## 📊 Key Features
+## Getting started
 
-- **Automated Financial Analysis**
-- **KPI Generation**
-- **Debtor Ageing Analysis**
-- **Regional Exposure Analysis**
-- **Financial Data Validation**
-- **Risk & Anomaly Detection**
-- **AI-Generated Financial Insights**
-- **Natural-Language Financial Q&A**
-- **Interactive Dashboard**
-- **Structured JSON Data Exchange**
+### 1. Set up the environment
 
----
+From the project root, create and activate a virtual environment if desired.
 
-## 🛠️ Tech Stack
+**Windows (PowerShell):**
 
-| Area | Technology |
-|---|---|
-| Programming | Python |
-| Data Processing | Pandas, NumPy |
-| Data Input | Excel |
-| Data Exchange | JSON |
-| AI | Google Gemini API / LLM |
-| Dashboard | Streamlit |
-| Visualization | Plotly, Matplotlib |
-| Testing | Pytest |
-| Version Control | Git, GitHub |
-
----
-
-## 📁 Project Structure
-
-```text
-InsightForge/
-│
-├── backend/
-│   ├── data/
-│   ├── outputs/
-│   ├── services/
-│   │   ├── data_loader.py
-│   │   ├── data_cleaning.py
-│   │   ├── validation.py
-│   │   ├── financial_analysis.py
-│   │   ├── ageing_analysis.py
-│   │   ├── regional_analysis.py
-│   │   └── json_export.py
-│   │
-│   └── main.py
-│
-├── frontend/
-│   └── components/
-│
-├── ai/
-│   └── ...
-│
-├── tests/
-│   └── test_calculations.py
-│
-├── requirements.txt
-├── .gitignore
-└── README.md
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
 
----
-
-## 🚀 Getting Started
-
-### Clone the repository
-
-```bash
-git clone <repository-url>
-cd InsightForge
-```
-
-### Create a virtual environment
+**Linux/macOS:**
 
 ```bash
 python -m venv .venv
-```
-
-### Activate the environment
-
-**Windows:**
-
-```powershell
-.venv\Scripts\activate
-```
-
-**Linux / macOS:**
-
-```bash
 source .venv/bin/activate
 ```
 
-### Install dependencies
+### 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Add the dataset
+### 3. Configure Gemini
 
-Place the financial dataset inside:
+Create a `.env` file in the project root:
 
-```text
-backend/data/
+```dotenv
+GEMINI_API_KEY=your_api_key_here
 ```
 
-### Run the backend
+Keep the real API key private. Do not commit `.env` to version control. A placeholder key is not a working credential.
+
+### 4. Run the dashboard
+
+Run this command from the project root:
 
 ```bash
-python -m backend.main
+streamlit run dashboard/app.py
 ```
 
-The processed financial results are exported as a structured JSON file for use by the AI layer.
+The application should open in your browser. Upload a supported financial dataset and follow the header detection and column mapping prompts.
 
----
+## Financial analysis
 
-## 👥 Team
+### Risk detection
 
-### Shreeyanshi Padhy
-**Financial Analytics & Data Engineering**
+The risk engine uses deterministic indicators based on account ageing and outstanding exposure. The current documented baseline is:
 
-- Data processing and cleaning
-- Financial analysis
-- KPI calculation
+**Ageing score**
+
+| Ageing days | Score |
+| ----------- | ----: |
+| 90 or more  |     3 |
+| 60–89       |     2 |
+| 30–59       |     1 |
+| Below 30    |     0 |
+
+**Exposure score**
+
+| Outstanding amount  | Score |
+| ------------------- | ----: |
+| ₹5,00,000 or more   |     3 |
+| ₹3,00,000–₹4,99,999 |     2 |
+| ₹1,00,000–₹2,99,999 |     1 |
+| Below ₹1,00,000     |     0 |
+
+The documented total score is the sum of ageing and exposure scores:
+
+`Risk Score = Ageing Score + Exposure Score`
+
+| Total score | Category |
+| ----------- | -------- |
+| 5 or more   | High     |
+| 3–4         | Medium   |
+| Below 3     | Low      |
+
+These are the thresholds described in the existing project documentation. Confirm them against the current implementation if the risk engine changes.
+
+### Anomaly detection
+
+The anomaly layer examines unusual outstanding amounts and ageing patterns. Records can receive anomaly indicators based on the configured thresholds. An anomaly is a signal for review, not proof of fraud or error.
+
+### AI insights and financial Q&A
+
+The application prepares structured financial context from calculated results before sending it to Gemini. Prompts are designed to preserve supplied values, use Indian Rupees (₹), avoid invented figures, and distinguish observations from assumptions. If a value is not available in the supplied context, the AI should say so.
+
+AI service failures should be handled gracefully so that a temporary Gemini outage does not prevent users from accessing the deterministic analysis.
+
+## Dashboard features
+
+The documented dashboard includes:
+
+- Account and outstanding-exposure KPIs.
+- Risk category and risk score distributions.
+- Ageing analysis.
+- Top exposure accounts.
+- Regional exposure and risk charts.
+- High-risk and account-level tables.
+- AI-generated financial insights.
+- Natural-language financial Q&A.
+
+The exact visible features depend on the current implementation and the dataset uploaded.
+
+## Testing
+
+Run the existing AI tests from the project root:
+
+```bash
+python ai/test_llm.py
+python ai/test_qa.py
+```
+
+Check the dashboard manually for:
+
+- Successful upload and header detection.
+- Correct column mapping.
+- Expected KPI, risk, ageing, and exposure results.
+- Correct chart and table rendering.
+- Successful AI insights and financial Q&A when the API is available.
+- Graceful behavior when Gemini is temporarily unavailable.
+- Correct CSV and JSON output.
+
+These are test instructions, not a claim that every test has been run in every environment.
+
+## Security
+
+- Store the Gemini API key in `.env`.
+- Ensure `.env` is listed in `.gitignore`.
+- Never commit API keys or credentials.
+- Treat uploaded financial data as potentially sensitive.
+
+Example `.gitignore` entries:
+
+```gitignore
+.env
+.venv/
+__pycache__/
+*.py[cod]
+```
+
+## Team contributions
+
+### Shreeyanshi — Financial Analytics & Data Engineering
+
+- Dataset ingestion and preprocessing
+- Data cleaning and validation
+- Financial calculations and KPI generation
 - Ageing and regional analysis
-- Data validation
-- JSON output pipeline
+- Structured output generation
+- Calculation accuracy testing
 
-### Abha Kiran Dongre
-**AI, Risk Analysis & Application Layer**
+### Abha Kiran Dongre — AI, Risk & Application Layer
 
-- Risk and anomaly detection
-- Gemini API integration
-- AI prompts and financial insights
-- Natural-language Q&A
-- Streamlit dashboard
-- Financial visualizations
+- Risk indicators and high-risk account identification
+- Anomaly detection
+- Gemini API integration and prompt design
+- Financial insights and natural-language Q&A
+- Streamlit dashboard and Plotly visualizations
+- AI/application integration and error handling
+- Validation of AI outputs against calculated results
+
+## Future enhancements
+
+Potential next steps include configurable risk thresholds, expanded Excel workbook support, consolidated automated tests, PDF executive reports, downloadable exports, historical run logging, database integration, containerization, authentication, and cloud deployment. These should be marked as complete only after implementation and testing.
 
 ---
 
-## 🌟 Core Principle
-
-> **Compute deterministically. Interpret intelligently.**
-
-InsightForge is built around the idea that **reliable financial computation and AI-powered interpretation should complement each other rather than replace one another.**
->>>>>>> 878fd6011c24d31ac47b00bad5b7e2ba74eb51d1
+**InsightForge — Hybrid Financial Intelligence System**
