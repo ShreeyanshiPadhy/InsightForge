@@ -1,21 +1,21 @@
 Account_ID,Customer_Name,Outstanding_Amount,Ageing_Days,Account_Status,Region,High_Amount_Anomaly,High_Ageing_Anomaly,Anomaly_Score,Anomaly_Category,Anomaly_Type,Anomaly_Reason
-A001,Alpha Traders,850000,120,Active,South,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A002,Beta Enterprises,75000,20,Active,North,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A003,Gamma Industries,420000,75,Active,West,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A004,Delta Solutions,180000,45,Active,South,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A005,Epsilon Corp,650000,105,Overdue,East,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A006,Zeta Ltd,95000,15,Active,North,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A007,Omega Retail,350000,65,Overdue,West,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A008,Prime Distributors,120000,35,Active,South,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A009,Vertex Systems,920000,150,Overdue,East,True,True,2,High,High Amount and High Ageing,"Outstanding amount is unusually high, Ageing is unusually high"
-A010,Global Supplies,280000,80,Active,North,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A011,Sunrise Foods,55000,10,Active,South,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A012,Metro Services,480000,95,Overdue,West,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A013,National Traders,310000,55,Active,East,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A014,Urban Products,125000,25,Active,North,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A015,Galaxy Exports,720000,110,Overdue,South,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A016,Blue Star Ltd,210000,70,Active,West,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A017,Evergreen Co,60000,30,Active,East,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A018,Future Tech,500000,90,Overdue,North,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A019,Starline Retail,140000,40,Active,South,False,False,0,Normal,No Anomaly,No unusual financial pattern detected
-A020,Global Tech,1100000,180,Overdue,West,True,True,2,High,High Amount and High Ageing,"Outstanding amount is unusually high, Ageing is unusually high"
+A001,Alpha Traders,850000,120,Active,South,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A002,Beta Enterprises,75000,20,Active,North,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A003,Gamma Industries,420000,75,Active,West,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A004,Delta Solutions,180000,45,Active,South,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A005,Epsilon Corp,650000,105,Overdue,East,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A006,Zeta Ltd,95000,15,Active,North,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A007,Omega Retail,350000,65,Overdue,West,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A008,Prime Distributors,120000,35,Active,South,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A009,Vertex Systems,920000,150,Overdue,East,True,True,2,High,High Amount and High Ageing,"Outstanding amount is above the dataset percentile threshold, Ageing is above the dataset percentile threshold"
+A010,Global Supplies,280000,80,Active,North,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A011,Sunrise Foods,55000,10,Active,South,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A012,Metro Services,480000,95,Overdue,West,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A013,National Traders,310000,55,Active,East,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A014,Urban Products,125000,25,Active,North,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A015,Galaxy Exports,720000,110,Overdue,South,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A016,Blue Star Ltd,210000,70,Active,West,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A017,Evergreen Co,60000,30,Active,East,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A018,Future Tech,500000,90,Overdue,North,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A019,Starline Retail,140000,40,Active,South,False,False,0,Normal,No Anomaly,No percentile-based anomaly detected
+A020,Global Tech,1100000,180,Overdue,West,True,True,2,High,High Amount and High Ageing,"Outstanding amount is above the dataset percentile threshold, Ageing is above the dataset percentile threshold"

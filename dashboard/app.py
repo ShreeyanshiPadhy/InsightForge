@@ -12,6 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../ai"))
 
 from financial_context import create_financial_context
 from llm import answer_financial_question,generate_financial_summary
+from anomaly_detection import perform_anomaly_analysis
 
 st.set_page_config(page_title="InsightForge",page_icon="📊",layout="wide")
 
@@ -22,26 +23,35 @@ def load_data():
     return pd.read_csv(DATA_FILE)
 
 
+
 HEADER_HINTS = {
     "account_id": [
         "cust code", "cust.code", "customer code",
-        "customer id", "account id", "debtor code"
+        "customer id", "account id", "debtor code",
+        "debtor number", "account number", "client id",
+        "account_id"
     ],
     "customer_name": [
         "customer name", "client name", "debtor name",
-        "account name", "customer", "debtor"
+        "account name", "customer", "debtor", "party",
+        "customer_name"
     ],
     "outstanding": [
         "outstanding amount", "outstanding balance",
         "receivable amount", "open balance",
-        "may'26 exp.", "amount due", "balance due"
+        "may'26 exp.", "amount due", "balance due",
+        "total outstanding", "outstanding_amount"
     ],
-    "region": ["region", "territory", "sales region"],
+    "region": [
+        "region", "territory", "sales region",
+        "geography", "location"
+    ],
     "status": [
         "active / inactive", "account status",
         "customer status", "status"
     ],
 }
+
 
 
 def normalize_header(value):
@@ -187,20 +197,169 @@ if uploaded_file is not None:
             f"Rows: {len(raw_df)} | Columns: {len(raw_df.columns)}"
         )
 
-        df = prepare_uploaded_data(raw_df)
-        st.success("Uploaded dataset processed successfully.")
+        
+        from upload_processor import detect_column_mapping
+
+        
+        detected_mapping = detect_column_mapping(raw_df.columns)
+
+        st.subheader("Column Mapping")
+        st.caption(
+            "Check the detected columns. Change a selection if a field "
+            "has been matched incorrectly."
+        )
+
+        required_fields = {
+            "Account_ID": "Account ID",
+            "Customer_Name": "Customer name",
+            "Outstanding_Amount": "Outstanding amount",
+        }
+
+        optional_fields = {
+            "Region": "Region (optional)",
+            "Account_Status": "Account status (optional)",
+        }
+
+        selected_mapping = {}
+        options = ["-- Select a column --"] + list(raw_df.columns)
+
+        for field, label in required_fields.items():
+            detected_column = detected_mapping.get(field)
+
+            default_index = (
+                options.index(detected_column)
+                if detected_column in options
+                else 0
+            )
+
+            selected_mapping[field] = st.selectbox(
+                label,
+                options=options,
+                index=default_index,
+                key=f"mapping_{field}",
+            )
+        
+        
+        optional_mapping = {}
+
+        for field, label in optional_fields.items():
+            detected_column = detected_mapping.get(field)
+
+            options = ["-- Not available --"] + list(raw_df.columns)
+
+            default_index = (
+                options.index(detected_column)
+                if detected_column in options
+                else 0
+            )
+
+            optional_mapping[field] = st.selectbox(
+                label,
+                options=options,
+                index=default_index,
+                key=f"optional_mapping_{field}",
+            )
+
+
+        mapping_complete = all(
+            selected_mapping[field] != "-- Select a column --"
+            for field in required_fields
+        )
+
+        if mapping_complete:
+            st.success("All required columns are mapped.")
+        else:
+            st.warning("Select a source column for every required field.")
+
+        apply_clicked = st.button(
+            "Process Dataset",
+            key="apply_column_mapping",
+            disabled=not mapping_complete,
+        )
+
+        # Process automatically when a new file or mapping is selected.
+        mapping_signature = tuple(
+            (field, selected_mapping[field])
+            for field in required_fields
+        )
+        current_signature = (
+            uploaded_file.name,
+            len(raw_df),
+            tuple(raw_df.columns),
+            mapping_signature,
+        )
+
+        st.session_state.pop("mapped_financial_df", None)
+        st.session_state.pop("mapping_signature", None)
+
+        
+        if apply_clicked and mapping_complete:
+            rename_mapping = {
+                source: target
+                for target, source in selected_mapping.items()
+            }
+
+            if len(set(rename_mapping)) != len(rename_mapping):
+                st.error(
+                    "Each required field must use a different source column."
+                )
+                st.stop()
+
+            
+            # Include optional mappings when the user selects a column.
+            for field, source in optional_mapping.items():
+                if source != "-- Not available --":
+                    rename_mapping[source] = field
+
+            mapped_df = raw_df.rename(columns=rename_mapping)
+
+            # Supply safe defaults when optional columns are absent.
+            if "Region" not in mapped_df.columns:
+                mapped_df["Region"] = "Unknown"
+
+            if "Account_Status" not in mapped_df.columns:
+                mapped_df["Account_Status"] = "Unknown"
+
+            try:
+                df = prepare_uploaded_data(mapped_df)
+                st.session_state["mapped_financial_df"] = df
+                st.session_state["mapping_signature"] = current_signature
+                st.session_state["mapping_success"] = True
+            except Exception as e:
+                st.session_state["mapping_success"] = False
+                st.error(f"Could not process mapped data: {e}")
+                st.stop()
+
+        if (
+            "mapped_financial_df" not in st.session_state
+            or st.session_state.get("mapping_signature") != current_signature
+        ):
+            st.info("Review the mappings and click Process Dataset.")
+            st.stop()
+
+        if st.session_state.get("mapping_success"):
+            st.success("Dataset processed successfully.")
+
+        df = st.session_state["mapped_financial_df"]
+
 
     except Exception as e:
         st.error(f"Could not process uploaded file: {e}")
         st.stop()
 
 else:
-    try:
-        df=load_data()
-        st.info("Using the default processed dataset. Upload a file to analyze another dataset.")
-    except Exception as e:
-        st.error(f"Could not load the default dataset: {e}")
-        st.stop()
+    st.info("Upload a financial dataset to begin analysis.")
+    st.stop()
+
+# Run anomaly detection on the active dataset
+try:
+    df, amount_threshold, ageing_threshold = perform_anomaly_analysis(df)
+
+    st.success("Anomaly detection completed successfully.")
+
+except Exception as e:
+    st.error(f"Anomaly detection failed: {e}")
+    st.stop()
 
 context=create_financial_context(df)
 financial_data=json.dumps(context,indent=2)

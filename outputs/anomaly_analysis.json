@@ -22,7 +22,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A002",
@@ -36,7 +36,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A003",
@@ -50,7 +50,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A004",
@@ -64,7 +64,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A005",
@@ -78,7 +78,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A006",
@@ -92,7 +92,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A007",
@@ -106,7 +106,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A008",
@@ -120,7 +120,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A009",
@@ -134,7 +134,7 @@
             "Anomaly_Score": 2,
             "Anomaly_Category": "High",
             "Anomaly_Type": "High Amount and High Ageing",
-            "Anomaly_Reason": "Outstanding amount is unusually high, Ageing is unusually high"
+            "Anomaly_Reason": "Outstanding amount is above the dataset percentile threshold, Ageing is above the dataset percentile threshold"
         },
         {
             "Account_ID": "A010",
@@ -148,7 +148,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A011",
@@ -162,7 +162,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A012",
@@ -176,7 +176,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A013",
@@ -190,7 +190,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A014",
@@ -204,7 +204,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A015",
@@ -218,7 +218,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A016",
@@ -232,7 +232,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A017",
@@ -246,7 +246,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A018",
@@ -260,7 +260,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A019",
@@ -274,7 +274,7 @@
             "Anomaly_Score": 0,
             "Anomaly_Category": "Normal",
             "Anomaly_Type": "No Anomaly",
-            "Anomaly_Reason": "No unusual financial pattern detected"
+            "Anomaly_Reason": "No percentile-based anomaly detected"
         },
         {
             "Account_ID": "A020",
@@ -288,7 +288,7 @@
             "Anomaly_Score": 2,
             "Anomaly_Category": "High",
             "Anomaly_Type": "High Amount and High Ageing",
-            "Anomaly_Reason": "Outstanding amount is unusually high, Ageing is unusually high"
+            "Anomaly_Reason": "Outstanding amount is above the dataset percentile threshold, Ageing is above the dataset percentile threshold"
         }
     ]
 }
