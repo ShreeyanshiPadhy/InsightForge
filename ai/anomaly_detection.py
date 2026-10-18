@@ -99,32 +99,49 @@ def generate_anomaly_reason(row):
 
     return ", ".join(reasons)
 
-def perform_anomaly_analysis(df,percentile=0.90):
-    if not 0<percentile<1:
-        raise ValueError("Percentile must be between 0 and 1.")
-
+def perform_anomaly_analysis(
+    df,
+    percentile=0.90,
+    fixed_amount_threshold=None,
+    fixed_ageing_threshold=None
+):
+    """
+    Detects anomalies using dynamic percentile or fixed threshold overrides.
+    """
     if df is None or df.empty:
         raise ValueError("Cannot analyze an empty dataset.")
 
-    missing=[column for column in ["Outstanding_Amount","Ageing_Days"] if column not in df.columns]
-
+    missing = [column for column in ["Outstanding_Amount", "Ageing_Days"] if column not in df.columns]
     if missing:
-        raise ValueError("Missing anomaly input columns: "+", ".join(missing))
+        raise ValueError("Missing anomaly input columns: " + ", ".join(missing))
 
-    df=prepare_data(df)
+    df = prepare_data(df)
 
-    amount_threshold=calculate_amount_threshold(df,percentile)
-    ageing_threshold=calculate_ageing_threshold(df,percentile)
+    # Determine Outstanding Amount threshold
+    if fixed_amount_threshold is not None:
+        amount_threshold = float(fixed_amount_threshold)
+    else:
+        if not 0 < percentile < 1:
+            raise ValueError("Percentile must be between 0 and 1.")
+        amount_threshold = float(df["Outstanding_Amount"].quantile(percentile))
 
-    df["High_Amount_Anomaly"]=detect_high_amount(df,amount_threshold)
-    df["High_Ageing_Anomaly"]=detect_high_ageing(df,ageing_threshold)
+    # Determine Ageing Days threshold
+    if fixed_ageing_threshold is not None:
+        ageing_threshold = float(fixed_ageing_threshold)
+    else:
+        if not 0 < percentile < 1:
+            raise ValueError("Percentile must be between 0 and 1.")
+        ageing_threshold = float(df["Ageing_Days"].quantile(percentile))
 
-    df["Anomaly_Score"]=df.apply(calculate_anomaly_score,axis=1)
-    df["Anomaly_Category"]=df["Anomaly_Score"].apply(get_anomaly_category)
-    df["Anomaly_Type"]=df.apply(detect_combined_anomaly,axis=1)
-    df["Anomaly_Reason"]=df.apply(generate_anomaly_reason,axis=1)
+    df["High_Amount_Anomaly"] = detect_high_amount(df, amount_threshold)
+    df["High_Ageing_Anomaly"] = detect_high_ageing(df, ageing_threshold)
 
-    return df,amount_threshold,ageing_threshold
+    df["Anomaly_Score"] = df.apply(calculate_anomaly_score, axis=1)
+    df["Anomaly_Category"] = df["Anomaly_Score"].apply(get_anomaly_category)
+    df["Anomaly_Type"] = df.apply(detect_combined_anomaly, axis=1)
+    df["Anomaly_Reason"] = df.apply(generate_anomaly_reason, axis=1)
+
+    return df, amount_threshold, ageing_threshold
 
 def get_anomalous_accounts(df):
     return df[df["Anomaly_Category"]!="Normal"].sort_values(
