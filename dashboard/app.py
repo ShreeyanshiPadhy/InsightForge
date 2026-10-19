@@ -25,7 +25,10 @@ from visualizations import (
 )
 from upload_processor import prepare_uploaded_data
 from ai.risk_detection import DEFAULT_RISK_CONFIG, perform_risk_analysis
-from pdf_generator import generate_financial_report
+from pdf_generator import (
+    generate_financial_report,
+    generate_general_finance_report,
+)
 
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), "../ai"))
@@ -201,6 +204,7 @@ session_defaults = {
     "mapping_signature": None,
     "mapping_success": False,
     "risk_config": DEFAULT_RISK_CONFIG.copy(),
+    "general_finance_pdf": None,
     "general_finance_summary": "",
     "general_finance_answer": "",
 }
@@ -327,19 +331,53 @@ try:
 
 
     # Route general-finance datasets before receivables-only column mapping.
+    
+    # Route datasets before receivables-only column mapping.
     def _norm_col(value):
         return re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
 
     normalized = {_norm_col(c) for c in raw_df.columns}
-    has_id = bool(normalized & {"accountid", "customerid", "debtorid"})
-    has_customer = bool(normalized & {"customername", "customer", "debtorname"})
-    has_outstanding = any(
-        any(term in c for term in ("outstandingamount", "outstandingbalance", "receivableamount", "amountdue", "balancedue"))
-        for c in normalized
-    )
-    is_receivables = has_id and has_customer and has_outstanding
 
-    if not is_receivables:
+    # Use broader aliases so receivables files with different headers
+    # can still reach the manual column-mapping interface.
+    has_id = bool(normalized & {
+        "accountid", "customerid", "debtorid",
+        "accountnumber", "debtornumber", "customercode",
+        "custcode", "clientid",
+    })
+
+    has_customer = bool(normalized & {
+        "customername", "customer", "debtorname",
+        "accountname", "clientname", "debtor", "party",
+    })
+
+    has_outstanding = any(
+        term in column
+        for column in normalized
+        for term in (
+            "outstandingamount", "outstandingbalance",
+            "receivableamount", "amountdue", "balancedue",
+            "openbalance", "totaloutstanding",
+        )
+    )
+
+    # Strong finance-specific indicators.
+    finance_markers = (
+        "state", "year", "financialyear", "fiscalyear",
+        "revenue", "expenditure", "capitaloutlay",
+        "budget", "tax", "income", "expense",
+    )
+
+    finance_score = sum(
+        any(marker in column for marker in finance_markers)
+        for column in normalized
+    )
+
+    # An ID plus a customer-like column is enough to offer
+    # receivables mapping, even if the amount header is unusual.
+    looks_like_receivables = has_id and has_customer
+
+    if not looks_like_receivables and finance_score >= 2:
         finance_df = prepare_general_finance_data(raw_df)
         numeric_columns = get_numeric_columns(finance_df)
 
@@ -718,6 +756,40 @@ try:
         with reports_tab:
             st.header("Reports & Downloads")
 
+            
+            st.subheader("Financial Analysis PDF")
+
+            if st.button(
+                "Generate Financial Analysis PDF",
+                key="generate_general_finance_pdf",
+                type="primary",
+            ):
+                try:
+                    pdf_bytes = generate_general_finance_report(
+                        finance_df,
+                        numeric_columns,
+                        st.session_state.get(
+                            "general_finance_summary", ""
+                        ),
+                    )
+                    st.session_state["general_finance_pdf"] = pdf_bytes
+                    st.success("Financial analysis PDF generated.")
+                except Exception as error:
+                    st.error(f"Could not generate PDF: {error}")
+
+            if st.session_state.get("general_finance_pdf") is not None:
+                st.download_button(
+                    "Download Financial Analysis PDF",
+                    data=st.session_state["general_finance_pdf"],
+                    file_name="InsightForge_General_Financial_Analysis.pdf",
+                    mime="application/pdf",
+                    key="download_general_finance_pdf",
+                    type="primary",
+                )
+
+            st.divider()
+
+
             csv_data = finance_df.to_csv(
                 index=False
             ).encode("utf-8-sig")
@@ -753,6 +825,13 @@ try:
 
         # Do not continue into receivables mapping or risk scoring.
         st.stop()
+    
+    if not looks_like_receivables:
+        st.warning(
+            "This dataset was not confidently identified as general "
+            "finance or receivables. You can still try mapping its "
+            "columns below."
+        )
 
 
     # Receivables dataset: preserve the existing mapping and risk workflow.
@@ -830,9 +909,9 @@ except Exception as error:
 # ============================================================
 # RISK THRESHOLD CONTROLS
 # ============================================================
-if st.session_state.get("dataset_type") != "general_finance":
-    st.sidebar.title("InsightForge Controls")
-    st.sidebar.header("Risk Thresholds")
+
+st.sidebar.title("InsightForge Controls")
+st.sidebar.header("Risk Thresholds")
 
 saved_config = st.session_state.get(
     "risk_config",
