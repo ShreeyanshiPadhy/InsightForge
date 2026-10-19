@@ -201,6 +201,8 @@ session_defaults = {
     "mapping_signature": None,
     "mapping_success": False,
     "risk_config": DEFAULT_RISK_CONFIG.copy(),
+    "general_finance_summary": "",
+    "general_finance_answer": "",
 }
 
 for key, default_value in session_defaults.items():
@@ -340,73 +342,418 @@ try:
     if not is_receivables:
         finance_df = prepare_general_finance_data(raw_df)
         numeric_columns = get_numeric_columns(finance_df)
-        finance_markers = ("state", "year", "revenue", "expenditure", "capitaloutlay", "budget", "tax", "income", "expense")
-        finance_score = sum(any(term in c for term in finance_markers) for c in normalized)
-        if finance_score >= 2:
-            st.divider()
-            st.header("General Financial Analysis")
-            st.caption("General-finance mode: receivables risk scoring is not applied unless account-level fields are present.")
-            if finance_df.empty or not numeric_columns:
-                st.warning("No usable numeric financial measures were detected. Check the header row and data format.")
-                st.dataframe(finance_df, use_container_width=True)
-                st.stop()
 
-            def _metric_col(*terms):
-                return next((c for c in numeric_columns if any(t in _norm_col(c) for t in terms)), None)
+        if finance_df.empty:
+            st.error("The uploaded dataset contains no usable data.")
+            st.stop()
 
-            revenue_col = _metric_col("revenue")
-            expenditure_col = _metric_col("expenditure", "expense")
-            capital_col = _metric_col("capitaloutlay")
-            key_metrics = [(label, col) for label, col in [("Total Revenue", revenue_col), ("Total Expenditure", expenditure_col), ("Capital Outlay", capital_col)] if col]
-            if key_metrics:
-                cards = st.columns(len(key_metrics))
-                for card, (label, col) in zip(cards, key_metrics):
-                    card.metric(label, f"{pd.to_numeric(finance_df[col], errors='coerce').sum():,.2f}")
+        st.session_state["dataset_type"] = "general_finance"
 
-            year_col = next((c for c in finance_df.columns if _norm_col(c) in {"year", "financialyear", "fiscalyear"}), None)
-            dimensions = [c for c in finance_df.columns if c != year_col and (not pd.api.types.is_numeric_dtype(finance_df[c]) or _norm_col(c) in {"state", "region", "country", "department", "category"})]
-            selected_metric = st.selectbox("Financial metric to analyze", numeric_columns, index=numeric_columns.index(revenue_col or expenditure_col or capital_col or numeric_columns[0]), key="general_finance_metric")
-            group_options = ["None"] + ([year_col] if year_col else []) + [c for c in dimensions if c != year_col]
-            selected_group = st.selectbox("Group results by", group_options, index=1 if year_col else 0, key="general_finance_dimension")
-            values = pd.to_numeric(finance_df[selected_metric], errors="coerce")
+        st.divider()
+        st.header("General Financial Analysis")
+        st.caption(
+            "General-finance mode. Receivables-specific column mapping "
+            "and risk scoring are not applied."
+        )
+
+        if not numeric_columns:
+            st.warning(
+                "No numeric financial measures were detected. "
+                "Check the header row and data format."
+            )
+
+        # Identify likely finance columns.
+        def _finance_col(*terms):
+            return next(
+                (
+                    col for col in numeric_columns
+                    if any(term in _norm_col(col) for term in terms)
+                ),
+                None,
+            )
+
+        revenue_col = _finance_col("revenue", "income", "sales")
+        expenditure_col = _finance_col("expenditure", "expense", "spending")
+        capital_col = _finance_col("capitaloutlay")
+
+        year_col = next(
+            (
+                col for col in finance_df.columns
+                if _norm_col(col) in {
+                    "year", "financialyear", "fiscalyear"
+                }
+            ),
+            None,
+        )
+
+        group_candidates = [
+            col for col in finance_df.columns
+            if col != year_col
+            and (
+                not pd.api.types.is_numeric_dtype(finance_df[col])
+                or _norm_col(col) in {
+                    "state", "region", "country",
+                    "department", "category"
+                }
+            )
+        ]
+
+        # Shared controls for general-finance analysis.
+        if numeric_columns:
+            default_metric = (
+                revenue_col
+                or expenditure_col
+                or capital_col
+                or numeric_columns[0]
+            )
+
+            selected_metric = st.selectbox(
+                "Financial metric to analyze",
+                numeric_columns,
+                index=numeric_columns.index(default_metric),
+                key="general_finance_metric",
+            )
+
+            group_options = ["None"]
+            if year_col:
+                group_options.append(year_col)
+            group_options.extend(
+                col for col in group_candidates
+                if col not in group_options
+            )
+
+            selected_group = st.selectbox(
+                "Group results by",
+                group_options,
+                index=1 if year_col else 0,
+                key="general_finance_dimension",
+            )
+
+            metric_values = pd.to_numeric(
+                finance_df[selected_metric],
+                errors="coerce",
+            )
+
+        else:
+            selected_metric = None
+            selected_group = "None"
+            metric_values = pd.Series(dtype=float)
+
+        # Four dashboard sections, adapted for general finance.
+        analytics_tab, ai_tab, data_tab, reports_tab = st.tabs(
+            [
+                "📊 Risk & Exposure",
+                "🤖 AI Assistant",
+                "📋 Data & Quality",
+                "📥 Reports & Downloads",
+            ]
+        )
+
+        # ----------------------------------------------------
+        # TAB 1: FINANCIAL ANALYTICS
+        # ----------------------------------------------------
+        with analytics_tab:
+            st.header("Financial Overview")
+
+            if numeric_columns:
+                metric_cards = []
+
+                for label, col in [
+                    ("Total Revenue", revenue_col),
+                    ("Total Expenditure", expenditure_col),
+                    ("Capital Outlay", capital_col),
+                ]:
+                    if col:
+                        values = pd.to_numeric(
+                            finance_df[col], errors="coerce"
+                        )
+                        metric_cards.append(
+                            (label, values.sum())
+                        )
+
+                if metric_cards:
+                    cards = st.columns(len(metric_cards))
+                    for card, (label, total) in zip(
+                        cards, metric_cards
+                    ):
+                        card.metric(label, f"{total:,.2f}")
+
+                a, b, c = st.columns(3)
+                a.metric("Records", f"{len(finance_df):,}")
+                b.metric(
+                    f"Total {selected_metric}",
+                    f"{metric_values.sum():,.2f}",
+                )
+                c.metric(
+                    "Average per record",
+                    (
+                        f"{metric_values.mean():,.2f}"
+                        if metric_values.notna().any()
+                        else "N/A"
+                    ),
+                )
+
+                if selected_group != "None":
+                    chart_data = finance_df[
+                        [selected_group, selected_metric]
+                    ].copy()
+                    chart_data[selected_metric] = pd.to_numeric(
+                        chart_data[selected_metric],
+                        errors="coerce",
+                    )
+                    grouped = (
+                        chart_data.dropna()
+                        .groupby(selected_group, as_index=False)[
+                            selected_metric
+                        ]
+                        .sum()
+                    )
+
+                    if not grouped.empty:
+                        st.subheader(
+                            f"{selected_metric} by {selected_group}"
+                        )
+
+                        if selected_group == year_col:
+                            grouped = grouped.sort_values(selected_group)
+                            fig = px.line(
+                                grouped,
+                                x=selected_group,
+                                y=selected_metric,
+                                markers=True,
+                            )
+                        else:
+                            grouped = grouped.sort_values(
+                                selected_metric,
+                                ascending=False,
+                            )
+                            fig = px.bar(
+                                grouped,
+                                x=selected_group,
+                                y=selected_metric,
+                            )
+
+                        st.plotly_chart(
+                            fig, use_container_width=True
+                        )
+                        st.dataframe(
+                            grouped, use_container_width=True
+                        )
+
+                if year_col and revenue_col and expenditure_col:
+                    trend = finance_df[
+                        [year_col, revenue_col, expenditure_col]
+                    ].copy()
+
+                    for col in (revenue_col, expenditure_col):
+                        trend[col] = pd.to_numeric(
+                            trend[col], errors="coerce"
+                        )
+
+                    trend = trend.dropna(subset=[year_col])
+                    trend = trend.groupby(
+                        year_col, as_index=False
+                    )[[revenue_col, expenditure_col]].sum()
+                    trend = trend.sort_values(year_col)
+
+                    st.subheader("Revenue vs Expenditure Trend")
+                    st.plotly_chart(
+                        px.line(
+                            trend,
+                            x=year_col,
+                            y=[revenue_col, expenditure_col],
+                            markers=True,
+                        ),
+                        use_container_width=True,
+                    )
+            else:
+                st.info(
+                    "No numeric measures are available to plot. "
+                    "Review the uploaded data in Data & Quality."
+                )
+
+        # ----------------------------------------------------
+        # TAB 2: AI ASSISTANT
+        # ----------------------------------------------------
+        with ai_tab:
+            st.header("AI Financial Assistant")
+            st.write(
+                "Ask questions about the uploaded financial dataset "
+                "or generate an AI-assisted summary."
+            )
+
+            finance_context = {
+                "dataset_type": "general_finance",
+                "columns": list(finance_df.columns),
+                "record_count": len(finance_df),
+                "numeric_summary": (
+                    finance_df[numeric_columns]
+                    .describe()
+                    .replace({float("inf"): None, float("-inf"): None})
+                    .to_dict()
+                    if numeric_columns else {}
+                ),
+                "sample_records": finance_df.head(50).to_dict(
+                    orient="records"
+                ),
+            }
+
+            finance_context_json = json.dumps(
+                finance_context,
+                indent=2,
+                default=str,
+            )
+
+            if st.button(
+                "Generate Financial Insights",
+                key="general_finance_generate_insights",
+                type="primary",
+            ):
+                with st.spinner("Generating financial insights..."):
+                    try:
+                        result = generate_financial_summary(
+                            finance_context_json
+                        )
+                        st.session_state[
+                            "general_finance_summary"
+                        ] = result or ""
+                    except Exception:
+                        st.warning(
+                            "AI insights are currently unavailable. "
+                            "You can still use the financial analysis."
+                        )
+
+            summary = st.session_state.get(
+                "general_finance_summary", ""
+            )
+            if summary:
+                st.subheader("Financial Insights")
+                st.markdown(summary)
+
+            question = st.text_input(
+                "Ask a question about this dataset",
+                placeholder=(
+                    "Example: Which year has the highest revenue?"
+                ),
+                key="general_finance_question",
+            )
+
+            if st.button(
+                "Ask InsightForge",
+                key="general_finance_ask",
+            ):
+                if question.strip():
+                    with st.spinner("Analyzing financial data..."):
+                        try:
+                            answer = answer_financial_question(
+                                question.strip(),
+                                finance_context_json,
+                            )
+                            st.session_state[
+                                "general_finance_answer"
+                            ] = answer
+                        except Exception:
+                            st.warning(
+                                "The AI assistant is temporarily "
+                                "unavailable. Please try again."
+                            )
+                else:
+                    st.warning("Please enter a question.")
+
+            answer = st.session_state.get(
+                "general_finance_answer", ""
+            )
+            if answer:
+                st.subheader("Answer")
+                st.write(answer)
+
+            st.caption(
+                "Verify AI-generated interpretations against the "
+                "original dataset."
+            )
+
+        # ----------------------------------------------------
+        # TAB 3: DATA AND QUALITY
+        # ----------------------------------------------------
+        with data_tab:
+            st.header("Dataset Overview")
+
             a, b, c = st.columns(3)
-            a.metric("Records", f"{len(finance_df):,}")
-            b.metric(f"Total {selected_metric}", f"{values.sum():,.2f}")
-            b.caption("Sum of available numeric values")
-            c.metric("Average per record", f"{values.mean():,.2f}" if values.notna().any() else "N/A")
+            a.metric("Total Records", f"{len(finance_df):,}")
+            b.metric("Total Columns", f"{len(finance_df.columns):,}")
+            c.metric(
+                "Numeric Measures", f"{len(numeric_columns):,}"
+            )
 
-            if selected_group != "None":
-                chart_data = finance_df[[selected_group, selected_metric]].copy()
-                chart_data[selected_metric] = pd.to_numeric(chart_data[selected_metric], errors="coerce")
-                grouped = chart_data.dropna().groupby(selected_group, as_index=False)[selected_metric].sum()
-                if not grouped.empty:
-                    st.subheader(f"{selected_metric} by {selected_group}")
-                    if selected_group == year_col:
-                        grouped = grouped.sort_values(selected_group)
-                        fig = px.line(grouped, x=selected_group, y=selected_metric, markers=True)
-                    else:
-                        grouped = grouped.sort_values(selected_metric, ascending=False)
-                        fig = px.bar(grouped, x=selected_group, y=selected_metric)
-                    st.plotly_chart(fig, use_container_width=True)
-                    st.dataframe(grouped, use_container_width=True)
+            st.divider()
+            st.subheader("Data Quality Check")
 
-            if year_col and revenue_col and expenditure_col:
-                trend = finance_df[[year_col, revenue_col, expenditure_col]].copy()
-                trend[year_col] = pd.to_numeric(trend[year_col], errors="coerce")
-                for col in (revenue_col, expenditure_col):
-                    trend[col] = pd.to_numeric(trend[col], errors="coerce")
-                trend = trend.dropna(subset=[year_col]).groupby(year_col, as_index=False)[[revenue_col, expenditure_col]].sum().sort_values(year_col)
-                st.subheader("Revenue vs Expenditure Trend")
-                st.plotly_chart(px.line(trend, x=year_col, y=[revenue_col, expenditure_col], markers=True), use_container_width=True)
+            missing_cells = int(
+                finance_df.isna().sum().sum()
+            )
+            duplicate_rows = int(
+                finance_df.duplicated().sum()
+            )
 
-            q1, q2, q3 = st.columns(3)
-            q1.metric("Missing cells", f"{int(finance_df.isna().sum().sum()):,}")
-            q2.metric("Duplicate rows", f"{int(finance_df.duplicated().sum()):,}")
-            q3.metric("Numeric measures", f"{len(numeric_columns):,}")
+            a, b = st.columns(2)
+            a.metric("Missing Cells", f"{missing_cells:,}")
+            b.metric("Duplicate Rows", f"{duplicate_rows:,}")
+
+            if missing_cells == 0 and duplicate_rows == 0:
+                st.success(
+                    "No missing cells or duplicate rows detected."
+                )
+            else:
+                st.warning(
+                    "Review missing cells and duplicate rows "
+                    "before interpreting results."
+                )
+
             st.subheader("Full Dataset")
             st.dataframe(finance_df, use_container_width=True)
-            st.download_button("Download Financial Analysis (CSV)", finance_df.to_csv(index=False).encode("utf-8-sig"), "insightforge_general_finance_analysis.csv", "text/csv", type="primary", key="download_general_finance_csv")
-            st.stop()
+
+        # ----------------------------------------------------
+        # TAB 4: REPORTS AND DOWNLOADS
+        # ----------------------------------------------------
+        with reports_tab:
+            st.header("Reports & Downloads")
+
+            csv_data = finance_df.to_csv(
+                index=False
+            ).encode("utf-8-sig")
+
+            st.download_button(
+                "Download Financial Data (CSV)",
+                data=csv_data,
+                file_name="insightforge_financial_data.csv",
+                mime="text/csv",
+                key="general_finance_download_csv",
+                type="primary",
+            )
+
+            json_data = finance_df.to_json(
+                orient="records",
+                indent=2,
+            ).encode("utf-8")
+
+            st.download_button(
+                "Download Financial Data (JSON)",
+                data=json_data,
+                file_name="insightforge_financial_data.json",
+                mime="application/json",
+                key="general_finance_download_json",
+                type="primary",
+            )
+
+            st.caption(
+                "These exports contain the cleaned general-finance "
+                "dataset. Receivables risk and anomaly reports are "
+                "not generated for this dataset type."
+            )
+
+        # Do not continue into receivables mapping or risk scoring.
+        st.stop()
+
 
     # Receivables dataset: preserve the existing mapping and risk workflow.
     from upload_processor import detect_column_mapping
@@ -483,9 +830,9 @@ except Exception as error:
 # ============================================================
 # RISK THRESHOLD CONTROLS
 # ============================================================
-
-st.sidebar.title("InsightForge Controls")
-st.sidebar.header("Risk Thresholds")
+if st.session_state.get("dataset_type") != "general_finance":
+    st.sidebar.title("InsightForge Controls")
+    st.sidebar.header("Risk Thresholds")
 
 saved_config = st.session_state.get(
     "risk_config",
