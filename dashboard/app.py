@@ -6,6 +6,14 @@ import sys
 import os
 import re
 
+import plotly.express as px
+
+from general_finance import (
+    detect_general_header_row,
+    prepare_general_finance_data,
+    get_numeric_columns,
+)
+
 from visualizations import (
     risk_category_chart,
     risk_exposure_chart,
@@ -240,6 +248,8 @@ try:
         preview = pd.read_excel(uploaded_file, header=None, nrows=30)
 
     detected_row = detect_header_row(preview)
+    if detected_row is None:
+        detected_row = detect_general_header_row(preview)
 
     if detected_row is not None:
         st.success(f"Suggested header row: {detected_row + 1}")
@@ -286,182 +296,189 @@ try:
         st.error("The selected header row produced an empty dataset.")
         st.stop()
 
-    st.subheader("Uploaded Data Preview")
-    st.dataframe(raw_df.head(10), use_container_width=True)
+    
+# Uploaded Data Preview with a View Full Data button
+    if "show_full_uploaded_data" not in st.session_state:
+        st.session_state.show_full_uploaded_data = False
+
+    heading_col, button_col = st.columns([4, 1])
+
+    with heading_col:
+        st.subheader("Uploaded Data Preview")
+
+    with button_col:
+        if st.button(
+            "Hide Full Data" if st.session_state.show_full_uploaded_data else "View Full Data",
+            key="toggle_uploaded_full_data",
+            use_container_width=True,
+        ):
+            st.session_state.show_full_uploaded_data = (
+                not st.session_state.show_full_uploaded_data
+            )
+
+    if st.session_state.show_full_uploaded_data:
+        st.dataframe(raw_df, use_container_width=True, height=500)
+    else:
+        st.dataframe(raw_df.head(10), use_container_width=True)
+
     st.caption(f"Rows: {len(raw_df):,} | Columns: {len(raw_df.columns):,}")
 
-    from upload_processor import detect_column_mapping
 
-    detected_mapping = detect_column_mapping(raw_df.columns)
+    # Route general-finance datasets before receivables-only column mapping.
+    def _norm_col(value):
+        return re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
 
-    st.subheader("Column Mapping")
-    st.caption(
-        "Review the automatically detected columns and change any "
-        "selection that is incorrect."
+    normalized = {_norm_col(c) for c in raw_df.columns}
+    has_id = bool(normalized & {"accountid", "customerid", "debtorid"})
+    has_customer = bool(normalized & {"customername", "customer", "debtorname"})
+    has_outstanding = any(
+        any(term in c for term in ("outstandingamount", "outstandingbalance", "receivableamount", "amountdue", "balancedue"))
+        for c in normalized
     )
+    is_receivables = has_id and has_customer and has_outstanding
 
-    required_fields = {
-        "Account_ID": "Account ID",
-        "Customer_Name": "Customer name",
-        "Outstanding_Amount": "Outstanding amount",
-    }
+    if not is_receivables:
+        finance_df = prepare_general_finance_data(raw_df)
+        numeric_columns = get_numeric_columns(finance_df)
+        finance_markers = ("state", "year", "revenue", "expenditure", "capitaloutlay", "budget", "tax", "income", "expense")
+        finance_score = sum(any(term in c for term in finance_markers) for c in normalized)
+        if finance_score >= 2:
+            st.divider()
+            st.header("General Financial Analysis")
+            st.caption("General-finance mode: receivables risk scoring is not applied unless account-level fields are present.")
+            if finance_df.empty or not numeric_columns:
+                st.warning("No usable numeric financial measures were detected. Check the header row and data format.")
+                st.dataframe(finance_df, use_container_width=True)
+                st.stop()
 
-    optional_fields = {
-        "Region": "Region (optional)",
-        "Account_Status": "Account status (optional)",
-    }
+            def _metric_col(*terms):
+                return next((c for c in numeric_columns if any(t in _norm_col(c) for t in terms)), None)
 
+            revenue_col = _metric_col("revenue")
+            expenditure_col = _metric_col("expenditure", "expense")
+            capital_col = _metric_col("capitaloutlay")
+            key_metrics = [(label, col) for label, col in [("Total Revenue", revenue_col), ("Total Expenditure", expenditure_col), ("Capital Outlay", capital_col)] if col]
+            if key_metrics:
+                cards = st.columns(len(key_metrics))
+                for card, (label, col) in zip(cards, key_metrics):
+                    card.metric(label, f"{pd.to_numeric(finance_df[col], errors='coerce').sum():,.2f}")
+
+            year_col = next((c for c in finance_df.columns if _norm_col(c) in {"year", "financialyear", "fiscalyear"}), None)
+            dimensions = [c for c in finance_df.columns if c != year_col and (not pd.api.types.is_numeric_dtype(finance_df[c]) or _norm_col(c) in {"state", "region", "country", "department", "category"})]
+            selected_metric = st.selectbox("Financial metric to analyze", numeric_columns, index=numeric_columns.index(revenue_col or expenditure_col or capital_col or numeric_columns[0]), key="general_finance_metric")
+            group_options = ["None"] + ([year_col] if year_col else []) + [c for c in dimensions if c != year_col]
+            selected_group = st.selectbox("Group results by", group_options, index=1 if year_col else 0, key="general_finance_dimension")
+            values = pd.to_numeric(finance_df[selected_metric], errors="coerce")
+            a, b, c = st.columns(3)
+            a.metric("Records", f"{len(finance_df):,}")
+            b.metric(f"Total {selected_metric}", f"{values.sum():,.2f}")
+            b.caption("Sum of available numeric values")
+            c.metric("Average per record", f"{values.mean():,.2f}" if values.notna().any() else "N/A")
+
+            if selected_group != "None":
+                chart_data = finance_df[[selected_group, selected_metric]].copy()
+                chart_data[selected_metric] = pd.to_numeric(chart_data[selected_metric], errors="coerce")
+                grouped = chart_data.dropna().groupby(selected_group, as_index=False)[selected_metric].sum()
+                if not grouped.empty:
+                    st.subheader(f"{selected_metric} by {selected_group}")
+                    if selected_group == year_col:
+                        grouped = grouped.sort_values(selected_group)
+                        fig = px.line(grouped, x=selected_group, y=selected_metric, markers=True)
+                    else:
+                        grouped = grouped.sort_values(selected_metric, ascending=False)
+                        fig = px.bar(grouped, x=selected_group, y=selected_metric)
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.dataframe(grouped, use_container_width=True)
+
+            if year_col and revenue_col and expenditure_col:
+                trend = finance_df[[year_col, revenue_col, expenditure_col]].copy()
+                trend[year_col] = pd.to_numeric(trend[year_col], errors="coerce")
+                for col in (revenue_col, expenditure_col):
+                    trend[col] = pd.to_numeric(trend[col], errors="coerce")
+                trend = trend.dropna(subset=[year_col]).groupby(year_col, as_index=False)[[revenue_col, expenditure_col]].sum().sort_values(year_col)
+                st.subheader("Revenue vs Expenditure Trend")
+                st.plotly_chart(px.line(trend, x=year_col, y=[revenue_col, expenditure_col], markers=True), use_container_width=True)
+
+            q1, q2, q3 = st.columns(3)
+            q1.metric("Missing cells", f"{int(finance_df.isna().sum().sum()):,}")
+            q2.metric("Duplicate rows", f"{int(finance_df.duplicated().sum()):,}")
+            q3.metric("Numeric measures", f"{len(numeric_columns):,}")
+            st.subheader("Full Dataset")
+            st.dataframe(finance_df, use_container_width=True)
+            st.download_button("Download Financial Analysis (CSV)", finance_df.to_csv(index=False).encode("utf-8-sig"), "insightforge_general_finance_analysis.csv", "text/csv", type="primary", key="download_general_finance_csv")
+            st.stop()
+
+    # Receivables dataset: preserve the existing mapping and risk workflow.
+    from upload_processor import detect_column_mapping
+    st.subheader("Column Mapping")
+    st.caption("Review the automatically detected columns and change any selection that is incorrect.")
+    detected_mapping = detect_column_mapping(raw_df.columns)
+    required_fields = {"Account_ID": "Account ID", "Customer_Name": "Customer name", "Outstanding_Amount": "Outstanding amount"}
+    optional_fields = {"Region": "Region (optional)", "Account_Status": "Account status (optional)"}
     selected_mapping = {}
     options = ["-- Select a column --"] + list(raw_df.columns)
-
     for field, label in required_fields.items():
         detected_column = detected_mapping.get(field)
-
-        default_index = (
-            options.index(detected_column)
-            if detected_column in options
-            else 0
-        )
-
-        selected_mapping[field] = st.selectbox(
-            label,
-            options=options,
-            index=default_index,
-            key=f"mapping_{field}",
-        )
-
+        default_index = options.index(detected_column) if detected_column in options else 0
+        selected_mapping[field] = st.selectbox(label, options=options, index=default_index, key=f"mapping_{field}")
     optional_mapping = {}
     optional_options = ["-- Not available --"] + list(raw_df.columns)
-
     for field, label in optional_fields.items():
         detected_column = detected_mapping.get(field)
-
-        default_index = (
-            optional_options.index(detected_column)
-            if detected_column in optional_options
-            else 0
-        )
-
-        optional_mapping[field] = st.selectbox(
-            label,
-            options=optional_options,
-            index=default_index,
-            key=f"optional_mapping_{field}",
-        )
-
-    mapping_complete = all(
-        selected_mapping[field] != "-- Select a column --"
-        for field in required_fields
-    )
-
-    selected_required_sources = [
-        selected_mapping[field] for field in required_fields
-    ]
-
+        default_index = optional_options.index(detected_column) if detected_column in optional_options else 0
+        optional_mapping[field] = st.selectbox(label, options=optional_options, index=default_index, key=f"optional_mapping_{field}")
+    mapping_complete = all(selected_mapping[f] != "-- Select a column --" for f in required_fields)
+    selected_required_sources = list(selected_mapping.values())
     if len(set(selected_required_sources)) != len(selected_required_sources):
         mapping_complete = False
-        st.warning(
-            "Each required field must map to a different source column."
-        )
-
-    selected_optional_sources = [
-        source for source in optional_mapping.values()
-        if source != "-- Not available --"
-    ]
-
-    if len(set(selected_optional_sources)) != len(selected_optional_sources):
+        st.warning("Each required field must map to a different source column.")
+    selected_optional_sources = [v for v in optional_mapping.values() if v != "-- Not available --"]
+    if len(set(selected_optional_sources)) != len(selected_optional_sources) or set(selected_required_sources).intersection(selected_optional_sources):
         mapping_complete = False
-        st.warning(
-            "An optional source column cannot be assigned to multiple fields."
-        )
-
-    if set(selected_required_sources).intersection(selected_optional_sources):
-        mapping_complete = False
-        st.warning(
-            "A source column cannot be used for both a required and "
-            "an optional field."
-        )
-
+        st.warning("A source column cannot be assigned to multiple fields.")
     if mapping_complete:
         st.success("Required columns are mapped.")
     else:
         st.warning("Please correct the column mapping before processing.")
 
-    mapping_signature = (
-        uploaded_file.name,
-        getattr(uploaded_file, "size", None),
-        int(header_row),
-        tuple(raw_df.columns),
-        tuple(selected_mapping.items()),
-        tuple(optional_mapping.items()),
-    )
-
-    apply_clicked = st.button(
-        "Process Dataset",
-        key="apply_column_mapping",
-        disabled=not mapping_complete,
-        type="primary",
-    )
-
+    mapping_signature = (uploaded_file.name, getattr(uploaded_file, "size", None), int(header_row), tuple(raw_df.columns), tuple(selected_mapping.items()), tuple(optional_mapping.items()))
+    if st.session_state.get("mapping_signature") != mapping_signature:
+        st.session_state["mapped_financial_df"] = None
+        st.session_state["mapping_success"] = False
+        st.session_state["financial_summary"] = ""
+        st.session_state["last_financial_answer"] = ""
+        st.session_state["financial_pdf"] = None
+    apply_clicked = st.button("Process Dataset", key="apply_column_mapping", disabled=not mapping_complete, type="primary")
     if apply_clicked and mapping_complete:
-        rename_mapping = {
-            source: target
-            for target, source in selected_mapping.items()
-        }
-
+        rename_mapping = {source: target for target, source in selected_mapping.items()}
         for field, source in optional_mapping.items():
             if source != "-- Not available --":
                 rename_mapping[source] = field
-
         mapped_df = raw_df.rename(columns=rename_mapping).copy()
-
-        if "Region" not in mapped_df.columns:
-            mapped_df["Region"] = "Unknown"
-
-        if "Account_Status" not in mapped_df.columns:
-            mapped_df["Account_Status"] = "Unknown"
-
+        if "Region" not in mapped_df.columns: mapped_df["Region"] = "Unknown"
+        if "Account_Status" not in mapped_df.columns: mapped_df["Account_Status"] = "Unknown"
         try:
-            risk_config = st.session_state.get(
-                "risk_config",
-                DEFAULT_RISK_CONFIG.copy(),
-            )
-
-            processed_df = prepare_uploaded_data(
-                mapped_df,
-                risk_config=risk_config,
-            )
-
+            risk_config = st.session_state.get("risk_config", DEFAULT_RISK_CONFIG.copy())
+            processed_df = prepare_uploaded_data(mapped_df, risk_config=risk_config)
             st.session_state["mapped_financial_df"] = processed_df
             st.session_state["mapping_signature"] = mapping_signature
             st.session_state["mapping_success"] = True
             st.session_state["financial_summary"] = ""
             st.session_state["last_financial_answer"] = ""
             st.session_state["financial_pdf"] = None
-
-            st.success(
-                f"Dataset processed successfully! "
-                f"{len(processed_df):,} accounts analyzed."
-            )
-
+            st.success(f"Dataset processed successfully! {len(processed_df):,} accounts analyzed.")
         except Exception as error:
             st.session_state["mapping_success"] = False
             st.error(f"Could not process mapped data: {error}")
             st.stop()
-
-    if (
-        st.session_state["mapped_financial_df"] is None
-        or st.session_state["mapping_signature"] != mapping_signature
-    ):
+    if st.session_state.get("mapped_financial_df") is None or st.session_state.get("mapping_signature") != mapping_signature:
         st.info("Review the mappings and click Process Dataset.")
         st.stop()
-
     df = st.session_state["mapped_financial_df"].copy()
 
 except Exception as error:
     st.error(f"Could not read or process the uploaded file: {error}")
     st.stop()
-
 
 # ============================================================
 # RISK THRESHOLD CONTROLS
@@ -509,28 +526,30 @@ with st.sidebar.expander("Ageing thresholds (days)", expanded=True):
 with st.sidebar.expander("Exposure thresholds (₹)", expanded=True):
     exposure_low = st.number_input(
         "Low exposure threshold (₹)",
-        min_value=0,
-        value=int(saved_config["exposure_low"]),
-        step=10000,
+        min_value=0.0,
+        value=float(saved_config["exposure_low"]),
+        step=0.1,
+        format="%.1f",
         key="exposure_low_input",
     )
 
     exposure_medium = st.number_input(
         "Medium exposure threshold (₹)",
-        min_value=1,
-        value=int(saved_config["exposure_medium"]),
-        step=10000,
+        min_value=0.1,
+        value=float(saved_config["exposure_medium"]),
+        step=0.1,
+        format="%.1f",
         key="exposure_medium_input",
     )
 
     exposure_high = st.number_input(
         "High exposure threshold (₹)",
-        min_value=1,
-        value=int(saved_config["exposure_high"]),
-        step=10000,
+        min_value=0.1,
+        value=float(saved_config["exposure_high"]),
+        step=0.1,
+        format="%.1f",
         key="exposure_high_input",
     )
-
 if not (exposure_low < exposure_medium < exposure_high):
     st.sidebar.error(
         "Set exposure thresholds in increasing order: "
@@ -554,15 +573,9 @@ try:
         st.session_state["mapped_financial_df"].copy(),
         config=risk_config,
     )
-
-    df, amount_threshold, ageing_threshold = perform_anomaly_analysis(df)
-
-    st.session_state["mapped_financial_df"] = df
-
 except Exception as error:
     st.error(f"Financial risk or anomaly analysis failed: {error}")
     st.stop()
-
 
 # ============================================================
 # FINANCIAL CONTEXT AND SUMMARY VALUES

@@ -43,9 +43,9 @@ DEFAULT_RISK_CONFIG={
     "ageing_medium":30,
     "ageing_high":60,
     "ageing_critical":90,
-    "exposure_low":100000,
-    "exposure_medium":300000,
-    "exposure_high":500000
+    "exposure_low":10,
+    "exposure_medium":30,
+    "exposure_high":50
 }
 
 def validate_risk_config(config):
@@ -87,12 +87,15 @@ def calculate_exposure_score(outstanding_amount,config=None):
 def calculate_total_risk_score(ageing_score,exposure_score):
     return ageing_score+exposure_score
 
+
 def get_risk_category(total_score):
-    if total_score>=5:
+    if total_score >= 5:
         return "High"
-    elif total_score>=3:
+    elif total_score >= 3:
         return "Medium"
-    return "Low"
+    else:
+        return "Low"
+
 
 def generate_risk_reason(ageing_days,outstanding_amount,config=None):
     config=config or DEFAULT_RISK_CONFIG
