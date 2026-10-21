@@ -303,9 +303,17 @@ try:
         st.stop()
 
     
+
 # Uploaded Data Preview with a View Full Data button
     if "show_full_uploaded_data" not in st.session_state:
         st.session_state.show_full_uploaded_data = False
+
+
+    def toggle_uploaded_full_data():
+        st.session_state.show_full_uploaded_data = (
+            not st.session_state.show_full_uploaded_data
+        )
+
 
     heading_col, button_col = st.columns([4, 1])
 
@@ -313,14 +321,17 @@ try:
         st.subheader("Uploaded Data Preview")
 
     with button_col:
-        if st.button(
-            "Hide Full Data" if st.session_state.show_full_uploaded_data else "View Full Data",
+        st.button(
+            (
+                "Hide Full Data"
+                if st.session_state.show_full_uploaded_data
+                else "View Full Data"
+            ),
             key="toggle_uploaded_full_data",
+            on_click=toggle_uploaded_full_data,
             use_container_width=True,
-        ):
-            st.session_state.show_full_uploaded_data = (
-                not st.session_state.show_full_uploaded_data
-            )
+            type="primary",
+        )
 
     if st.session_state.show_full_uploaded_data:
         st.dataframe(raw_df, use_container_width=True, height=500)
@@ -328,6 +339,7 @@ try:
         st.dataframe(raw_df.head(10), use_container_width=True)
 
     st.caption(f"Rows: {len(raw_df):,} | Columns: {len(raw_df.columns):,}")
+
 
 
     # Route general-finance datasets before receivables-only column mapping.
