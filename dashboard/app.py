@@ -1444,6 +1444,7 @@ with reports_tab:
             pdf_bytes = generate_financial_report(
                 df=df,
                 summary_text=st.session_state.get("financial_summary", ""),
+                risk_config=risk_config,
             )
 
             st.session_state["financial_pdf"] = pdf_bytes
