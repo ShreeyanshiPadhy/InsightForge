@@ -5,6 +5,11 @@ import time
 
 load_dotenv()
 
+if __package__:
+    from .prompts import DATASET_QA_PROMPT, DATASET_SUMMARY_PROMPT
+else:
+    from prompts import DATASET_QA_PROMPT, DATASET_SUMMARY_PROMPT
+
 def get_client():
     api_key=os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -81,3 +86,14 @@ Validated Financial Data:
         contents=prompt
     )
     return response.text
+
+
+def generate_dataset_summary(dataset_data):
+    """Explain dataset-driven analysis without imposing debtor assumptions."""
+    return generate_insight(dataset_data, DATASET_SUMMARY_PROMPT)
+
+
+def answer_dataset_question(question, dataset_data):
+    """Answer a question using a dataset-neutral context and prompt."""
+    prompt = DATASET_QA_PROMPT.format(question=question)
+    return generate_insight(dataset_data, prompt)

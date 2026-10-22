@@ -2,7 +2,7 @@
 
 **Hybrid Financial Intelligence System**
 
-InsightForge analyzes financial receivables and debtor data using deterministic Python calculations and AI-assisted interpretation. It combines validated financial metrics, risk indicators, anomaly detection, interactive visualizations, and natural-language insights in a Streamlit dashboard.
+InsightForge analyzes uploaded tabular and financial data using deterministic Python calculations and AI-assisted interpretation. It profiles each dataset, derives suitable metrics and visualizations from its actual columns, and applies debtor-specific risk logic only to recognized receivables data.
 
 > **Core principle:** Compute deterministically. Interpret intelligently.
 
@@ -12,8 +12,13 @@ Large financial spreadsheets can be difficult to review manually. InsightForge p
 
 ## Key features
 
-- Upload and process financial datasets.
-- Detect and map common financial column names.
+- Upload and profile CSV and Excel datasets.
+- Detect column types, missing values, duplicates, identifier-like fields, candidate dimensions, and measures.
+- Generate traceable, dataset-specific KPIs and grouped summaries.
+- Identify common financial measures such as revenue, expenses, and outstanding balances from column meaning.
+- Analyze date ranges, record trends, category counts, and numeric distributions when the uploaded data supports them.
+- Preserve original uploaded rows and values; numeric/date conversions are derived analysis views.
+- Detect and map common receivables column names.
 - Validate records and prepare normalized account-level data.
 - Calculate financial KPIs and ageing metrics.
 - Classify account risk using ageing and exposure indicators.
@@ -91,6 +96,7 @@ InsightForge/
 │   └── test_qa.py
 ├── dashboard/
 │   ├── app.py
+│   ├── dataset_analytics.py
 │   ├── upload_processor.py
 │   └── visualizations.py
 └── outputs/
@@ -146,7 +152,13 @@ Run this command from the project root:
 streamlit run dashboard/app.py
 ```
 
-The application should open in your browser. Upload a supported financial dataset and follow the header detection and column mapping prompts.
+The application should open in your browser. Upload a CSV or Excel dataset and follow the header detection prompts. Recognized receivables files retain the column-mapping and risk-analysis workflow. Other datasets use dataset-driven profiling, KPIs, dimensions, and charts without requiring debtor-specific fields.
+
+## Dataset-driven analytics
+
+The `dashboard/dataset_analytics.py` module profiles a DataFrame without mutating it. Its profile includes the source shape, inferred column types and roles, missing-value statistics, duplicate-row counts, representative values, and candidate dimensions/measures. It reports mixed/non-numeric values rather than silently replacing or dropping source records.
+
+Numeric identifiers (for example, account, invoice, and postal codes) are excluded from measure KPIs. Numeric metrics identify their source column and calculation; column names only receive financial labels when their meaning supports the interpretation. Date and category summaries are produced when suitable columns and observations exist. Generic numeric fields are described with neutral statistics rather than being presented as revenue.
 
 ## Financial analysis
 
@@ -211,18 +223,25 @@ The exact visible features depend on the current implementation and the dataset 
 
 ## Testing
 
-Run the existing AI tests from the project root:
+Run the Gemini-backed manual smoke tests from the project root (these require a configured API key):
 
 ```bash
 python ai/test_llm.py
 python ai/test_qa.py
 ```
 
+Run the automated calculation and dataset-analytics tests from the project root:
+
+```bash
+python -m pytest -q tests
+```
+
 Check the dashboard manually for:
 
 - Successful upload and header detection.
 - Correct column mapping.
-- Expected KPI, risk, ageing, and exposure results.
+- Dataset profile, source-column KPI traceability, and expected risk results for receivables data.
+- Dataset-driven summaries for a general CSV or Excel file with no debtor columns.
 - Correct chart and table rendering.
 - Successful AI insights and financial Q&A when the API is available.
 - Graceful behavior when Gemini is temporarily unavailable.

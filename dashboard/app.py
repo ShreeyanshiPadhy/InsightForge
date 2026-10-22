@@ -10,8 +10,11 @@ import plotly.express as px
 
 from general_finance import (
     detect_general_header_row,
-    prepare_general_finance_data,
-    get_numeric_columns,
+)
+from dataset_analytics import (
+    generate_dynamic_kpis,
+    numeric_values,
+    profile_dataset,
 )
 
 from visualizations import (
@@ -35,7 +38,12 @@ sys.path.append(
 )
 
 from financial_context import create_financial_context
-from llm import answer_financial_question, generate_financial_summary
+from llm import (
+    answer_dataset_question,
+    answer_financial_question,
+    generate_dataset_summary,
+    generate_financial_summary,
+)
 from anomaly_detection import perform_anomaly_analysis
 
 
@@ -232,10 +240,10 @@ st.divider()
 # DATASET UPLOAD AND PROCESSING
 # ============================================================
 
-st.header("1. Upload Financial Dataset")
+st.header("1. Upload Dataset")
 
 uploaded_file = st.file_uploader(
-    "Upload debtor or receivables data",
+    "Upload a CSV or Excel dataset",
     type=["csv", "xlsx", "xls"],
     key="financial_upload",
 )
@@ -296,7 +304,6 @@ try:
         str(column).replace("\u00a0", " ").strip()
         for column in raw_df.columns
     ]
-    raw_df = raw_df.dropna(how="all")
 
     if raw_df.empty:
         st.error("The selected header row produced an empty dataset.")
@@ -348,7 +355,8 @@ try:
     def _norm_col(value):
         return re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
 
-    normalized = {_norm_col(c) for c in raw_df.columns}
+    normalized_columns = [_norm_col(c) for c in raw_df.columns]
+    normalized = set(normalized_columns)
 
     # Use broader aliases so receivables files with different headers
     # can still reach the manual column-mapping interface.
@@ -369,41 +377,44 @@ try:
         for term in (
             "outstandingamount", "outstandingbalance",
             "receivableamount", "amountdue", "balancedue",
-            "openbalance", "totaloutstanding",
+            "openbalance", "totaloutstanding", "may26exp",
         )
     )
 
-    # Strong finance-specific indicators.
-    finance_markers = (
-        "state", "year", "financialyear", "fiscalyear",
-        "revenue", "expenditure", "capitaloutlay",
-        "budget", "tax", "income", "expense",
+    has_ageing = any(
+        any(term in _norm_col(column) for term in (
+            "ageingdays", "agingdays", "daysoverdue",
+            "dayspastdue", "daysoutstanding", "ageing", "aging",
+        ))
+        or bool(re.search(r"\d+\s*(?:-|to)\s*\d+", str(column).lower()))
+        or bool(re.search(r"(?:>\s*=?\s*\d+|\d+\s*\+)", str(column).lower()))
+        for column in raw_df.columns
     )
 
-    finance_score = sum(
-        any(marker in column for marker in finance_markers)
-        for column in normalized
+    # The existing receivables workflow requires both an exposure and ageing measure.
+    looks_like_receivables = (
+        has_id and has_customer and has_outstanding and has_ageing
     )
 
-    # An ID plus a customer-like column is enough to offer
-    # receivables mapping, even if the amount header is unusual.
-    looks_like_receivables = has_id and has_customer
-
-    if not looks_like_receivables and finance_score >= 2:
-        finance_df = prepare_general_finance_data(raw_df)
-        numeric_columns = get_numeric_columns(finance_df)
+    if not looks_like_receivables:
+        # Keep the uploaded values intact; analytics derive temporary views.
+        finance_df = raw_df.copy()
+        dataset_profile = profile_dataset(finance_df)
+        dynamic_analytics = generate_dynamic_kpis(finance_df, dataset_profile)
+        numeric_columns = dataset_profile["candidate_measures"]
 
         if finance_df.empty:
-            st.error("The uploaded dataset contains no usable data.")
+            st.error("The uploaded dataset contains no data rows.")
             st.stop()
 
         st.session_state["dataset_type"] = "general_finance"
 
         st.divider()
-        st.header("General Financial Analysis")
+        st.header("Dataset-Driven Analysis")
         st.caption(
-            "General-finance mode. Receivables-specific column mapping "
-            "and risk scoring are not applied."
+            "Metrics, dimensions, and charts are derived from this upload. "
+            "Receivables-specific risk scoring is used only for recognized "
+            "receivables datasets."
         )
 
         if not numeric_columns:
@@ -412,7 +423,7 @@ try:
                 "Check the header row and data format."
             )
 
-        # Identify likely finance columns.
+        # Identify financial measures using semantic hints, not fixed headers.
         def _finance_col(*terms):
             return next(
                 (
@@ -422,31 +433,20 @@ try:
                 None,
             )
 
-        revenue_col = _finance_col("revenue", "income", "sales")
-        expenditure_col = _finance_col("expenditure", "expense", "spending")
+        revenue_col = _finance_col("revenue", "income", "sales", "turnover")
+        expenditure_col = _finance_col("expenditure", "expense", "spending", "cost")
         capital_col = _finance_col("capitaloutlay")
 
         year_col = next(
             (
                 col for col in finance_df.columns
-                if _norm_col(col) in {
-                    "year", "financialyear", "fiscalyear"
-                }
+                if col in dataset_profile["date_columns"]
+                or _norm_col(col) in {"year", "financialyear", "fiscalyear"}
             ),
             None,
         )
 
-        group_candidates = [
-            col for col in finance_df.columns
-            if col != year_col
-            and (
-                not pd.api.types.is_numeric_dtype(finance_df[col])
-                or _norm_col(col) in {
-                    "state", "region", "country",
-                    "department", "category"
-                }
-            )
-        ]
+        group_candidates = dataset_profile["candidate_dimensions"]
 
         # Shared controls for general-finance analysis.
         if numeric_columns:
@@ -479,10 +479,11 @@ try:
                 key="general_finance_dimension",
             )
 
-            metric_values = pd.to_numeric(
-                finance_df[selected_metric],
-                errors="coerce",
+            metric_position = next(
+                item["position"] for item in dataset_profile["columns"]
+                if item["column"] == selected_metric
             )
+            metric_values = numeric_values(finance_df.iloc[:, metric_position])
 
         else:
             selected_metric = None
@@ -492,7 +493,7 @@ try:
         # Four dashboard sections, adapted for general finance.
         analytics_tab, ai_tab, data_tab, reports_tab = st.tabs(
             [
-                "📊 Risk & Exposure",
+                "📊 Analytics",
                 "🤖 AI Assistant",
                 "📋 Data & Quality",
                 "📥 Reports & Downloads",
@@ -503,30 +504,28 @@ try:
         # TAB 1: FINANCIAL ANALYTICS
         # ----------------------------------------------------
         with analytics_tab:
-            st.header("Financial Overview")
+            st.header("Dataset Overview")
 
             if numeric_columns:
-                metric_cards = []
-
-                for label, col in [
-                    ("Total Revenue", revenue_col),
-                    ("Total Expenditure", expenditure_col),
-                    ("Capital Outlay", capital_col),
-                ]:
-                    if col:
-                        values = pd.to_numeric(
-                            finance_df[col], errors="coerce"
+                featured = [
+                    metric for metric in dynamic_analytics["kpis"]
+                    if metric["calculation"] == "sum"
+                    and metric["label"].startswith("Total ")
+                    and metric["label"] != "Total "
+                ][:4]
+                if not featured:
+                    featured = [
+                        metric for metric in dynamic_analytics["kpis"]
+                        if metric["calculation"] in {"mean", "median"}
+                    ][:4]
+                if featured:
+                    cards = st.columns(len(featured))
+                    for card, metric in zip(cards, featured):
+                        card.metric(metric["label"], f"{metric['value']:,.2f}")
+                        card.caption(
+                            f"Source: {metric['source_columns'][0]} "
+                            f"({metric['calculation']})"
                         )
-                        metric_cards.append(
-                            (label, values.sum())
-                        )
-
-                if metric_cards:
-                    cards = st.columns(len(metric_cards))
-                    for card, (label, total) in zip(
-                        cards, metric_cards
-                    ):
-                        card.metric(label, f"{total:,.2f}")
 
                 a, b, c = st.columns(3)
                 a.metric("Records", f"{len(finance_df):,}")
@@ -547,10 +546,12 @@ try:
                     chart_data = finance_df[
                         [selected_group, selected_metric]
                     ].copy()
-                    chart_data[selected_metric] = pd.to_numeric(
-                        chart_data[selected_metric],
-                        errors="coerce",
-                    )
+                    chart_data[selected_metric] = metric_values
+                    if selected_group in dataset_profile["date_columns"]:
+                        chart_data[selected_group] = pd.to_datetime(
+                            chart_data[selected_group], errors="coerce",
+                            format="mixed",
+                        ).dt.to_period("M").astype(str)
                     grouped = (
                         chart_data.dropna()
                         .groupby(selected_group, as_index=False)[
@@ -596,9 +597,11 @@ try:
                     ].copy()
 
                     for col in (revenue_col, expenditure_col):
-                        trend[col] = pd.to_numeric(
-                            trend[col], errors="coerce"
+                        position = next(
+                            item["position"] for item in dataset_profile["columns"]
+                            if item["column"] == col
                         )
+                        trend[col] = numeric_values(finance_df.iloc[:, position])
 
                     trend = trend.dropna(subset=[year_col])
                     trend = trend.groupby(
@@ -622,6 +625,26 @@ try:
                     "Review the uploaded data in Data & Quality."
                 )
 
+            category_summary = next(
+                (
+                    summary for summary in dynamic_analytics["distributions"]
+                    if "top_categories" in summary
+                    and summary["top_categories"]
+                ),
+                None,
+            )
+            if category_summary:
+                st.subheader(f"Most common values: {category_summary['column']}")
+                st.plotly_chart(
+                    px.bar(
+                        pd.DataFrame(category_summary["top_categories"]),
+                        x="category",
+                        y="count",
+                        title=f"Category counts for {category_summary['column']}",
+                    ),
+                    use_container_width=True,
+                )
+
         # ----------------------------------------------------
         # TAB 2: AI ASSISTANT
         # ----------------------------------------------------
@@ -633,16 +656,9 @@ try:
             )
 
             finance_context = {
-                "dataset_type": "general_finance",
-                "columns": list(finance_df.columns),
-                "record_count": len(finance_df),
-                "numeric_summary": (
-                    finance_df[numeric_columns]
-                    .describe()
-                    .replace({float("inf"): None, float("-inf"): None})
-                    .to_dict()
-                    if numeric_columns else {}
-                ),
+                "dataset_type": "dataset_driven",
+                "profile": dataset_profile,
+                "analytics": dynamic_analytics,
                 "sample_records": finance_df.head(50).to_dict(
                     orient="records"
                 ),
@@ -661,7 +677,7 @@ try:
             ):
                 with st.spinner("Generating financial insights..."):
                     try:
-                        result = generate_financial_summary(
+                        result = generate_dataset_summary(
                             finance_context_json
                         )
                         st.session_state[
@@ -695,7 +711,7 @@ try:
                 if question.strip():
                     with st.spinner("Analyzing financial data..."):
                         try:
-                            answer = answer_financial_question(
+                            answer = answer_dataset_question(
                                 question.strip(),
                                 finance_context_json,
                             )
@@ -734,6 +750,68 @@ try:
             c.metric(
                 "Numeric Measures", f"{len(numeric_columns):,}"
             )
+
+            st.divider()
+            st.subheader("Column Profile")
+            st.dataframe(
+                pd.DataFrame(dataset_profile["columns"]),
+                use_container_width=True,
+                hide_index=True,
+            )
+            if dataset_profile["warnings"]:
+                with st.expander("Data-quality warnings", expanded=False):
+                    for warning in dataset_profile["warnings"]:
+                        st.warning(warning)
+
+            st.subheader("Generated KPIs")
+            if dynamic_analytics["kpis"]:
+                st.dataframe(
+                    pd.DataFrame(dynamic_analytics["kpis"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info("No suitable numeric measures were detected.")
+
+            if dynamic_analytics["date_summaries"]:
+                st.subheader("Date coverage")
+                st.dataframe(
+                    pd.DataFrame(dynamic_analytics["date_summaries"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            if dynamic_analytics["distributions"]:
+                st.subheader("Numeric distributions and category counts")
+                st.dataframe(
+                    pd.DataFrame(dynamic_analytics["distributions"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            if dynamic_analytics["grouped_summaries"]:
+                st.subheader("Grouped measure summaries")
+                for summary in dynamic_analytics["grouped_summaries"][:10]:
+                    with st.expander(
+                        f"{summary['measure']} by {summary['dimension']}"
+                    ):
+                        st.dataframe(
+                            pd.DataFrame(summary["values"]),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+            if dynamic_analytics["period_summaries"]:
+                st.subheader("Period-wise measure summaries")
+                for summary in dynamic_analytics["period_summaries"][:10]:
+                    with st.expander(
+                        f"{summary['measure']} by {summary['date_column']} (monthly)"
+                    ):
+                        st.dataframe(
+                            pd.DataFrame(summary["values"]),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
 
             st.divider()
             st.subheader("Data Quality Check")
@@ -830,22 +908,14 @@ try:
             )
 
             st.caption(
-                "These exports contain the cleaned general-finance "
-                "dataset. Receivables risk and anomaly reports are "
-                "not generated for this dataset type."
+                "Exports preserve the uploaded columns and rows. "
+                "Receivables risk and anomaly reports are not generated "
+                "for this dataset type."
             )
 
         # Do not continue into receivables mapping or risk scoring.
         st.stop()
     
-    if not looks_like_receivables:
-        st.warning(
-            "This dataset was not confidently identified as general "
-            "finance or receivables. You can still try mapping its "
-            "columns below."
-        )
-
-
     # Receivables dataset: preserve the existing mapping and risk workflow.
     from upload_processor import detect_column_mapping
     st.subheader("Column Mapping")
